@@ -1,0 +1,24 @@
+Vorrat fuer neue Raeume
+=======================
+
+Was hier liegt, bekommt ein Raum von selbst in die Warteschlange, sobald ihn
+jemand betritt und dort weder Teilnehmer noch Videos sind.
+
+Je Raum ein Unterordner:
+
+    default/wohnzimmer/01 Vorfilm.mp4
+    default/wohnzimmer/02 Hauptfilm.mp4
+
+Der Ordnername ist der Raumname, so wie er in der Adresszeile steht
+(Kleinbuchstaben, Leerzeichen werden zu Bindestrichen). Ersatzweise geht auch
+die Kennung des Raumes, also der Name des Ordners unter media/.
+
+  * Nur mp4, m4v, webm, ogv, ogg und mov. Alles andere wird uebergangen.
+  * Die Reihenfolge ist die der Dateinamen, deshalb die Nummern davor.
+  * Laufzeit und Vorschaubild entstehen beim Uebernehmen mit ffmpeg.
+  * Die Dateien hier bleiben liegen. Der Raum bekommt einen eigenen Eintrag,
+    nach Moeglichkeit als harte Verknuepfung. Wird das Video im Raum
+    geloescht, ist es hier weiterhin da.
+
+Abschalten laesst sich das Ganze mit WT_SEED=0, einen anderen Ort nennt
+WT_DEFAULT_DIR.

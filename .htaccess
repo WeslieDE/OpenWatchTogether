@@ -1,0 +1,10 @@
+# Kein Blaettern in Ordnern.
+Options -Indexes
+
+# Interne Dateien bleiben aussen vor. Die Videos liegen ohnehin ausserhalb des
+# Webverzeichnisses und kommen nur ueber die API heraus.
+<FilesMatch "^(composer\.(json|lock)|config\.local\.php|Dockerfile|\.dockerignore|.*\.md)$">
+    Require all denied
+</FilesMatch>
+
+DirectoryIndex index.html

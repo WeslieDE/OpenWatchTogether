@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Watch Together</title>
+<meta name="description" content="Gemeinsam Videos schauen, synchron und im selben Raum.">
+<link rel="stylesheet" href="assets/css/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d14417'/%3E%3Cpath d='M13 10.5v11l9-5.5z' fill='%23fff'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- ============================================================
+     Icon-Sprite. Minimal-geometrische Glyphen, eine Familie,
+     einheitliche Strichstaerke 1.6, 24er Grid.
+     ============================================================ -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 6.5A2.5 2.5 0 0 0 12.5 4H6.5A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2V7M6.5 7l.9 12.1a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l4.3-1.1L20 7.2a1.6 1.6 0 0 0 0-2.3l-1-.9a1.6 1.6 0 0 0-2.2 0L5.1 15.7z"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3.5 7.5l3.7 2.6L12 4l4.8 6.1 3.7-2.6L18.8 19H5.2z"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4.5 9.5h3.2L12 6v12l-4.3-3.5H4.5z"/><path d="M15.6 9.4a3.6 3.6 0 0 1 0 5.2M18.1 6.9a7.1 7.1 0 0 1 0 10.2"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4.5 9.5h3.2L12 6v12l-4.3-3.5H4.5z"/><path d="M16 10l4 4M20 10l-4 4"/></symbol>
+  <symbol id="i-minimize" viewBox="0 0 24 24"><path d="M5 17h14"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16.5V4.5M7.8 8.7L12 4.5l4.2 4.2M4.5 19.5h15"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9.5" cy="8.5" r="3.5"/><path d="M3.5 20a6 6 0 0 1 12 0"/><path d="M16.2 5.4a3.4 3.4 0 0 1 0 6.4M17.5 14.6a5.6 5.6 0 0 1 3.3 5.4"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 7h9M4 12h9M4 17h6M20 9v8l-4.5-4z" /></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4.5 9V4.5H9M15 4.5h4.5V9M19.5 15v4.5H15M9 19.5H4.5V15"/></symbol>
+  <symbol id="i-again" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7M20.5 4v4.5H16"/></symbol>
+</svg>
+
+<!-- ============================================================ RAUM ============ -->
+<div class="veil" id="veilRoom" hidden>
+  <div class="sheet sheet-narrow" role="dialog" aria-modal="true" aria-labelledby="roomTitle">
+    <div class="sheet-mark"><span class="logomark"><svg><use href="#i-play"/></svg></span></div>
+    <h1 class="sheet-title" id="roomTitle">Watch Together</h1>
+    <p class="sheet-lead" data-i18n="room.lead"></p>
+    <form class="field-form" id="formRoom" novalidate>
+      <div class="field">
+        <label class="field-label" for="inpRoom" data-i18n="room.label"></label>
+        <input class="input" id="inpRoom" type="text" autocomplete="off" spellcheck="false"
+               maxlength="40" required>
+        <p class="field-hint" data-i18n="room.hint"></p>
+        <p class="field-error" id="errRoom" hidden></p>
+      </div>
+      <button class="btn btn-accent btn-block" type="submit" data-i18n="room.submit"></button>
+    </form>
+    <div class="suggest">
+      <div class="suggest-head">
+        <span class="suggest-label" data-i18n="suggest.label"></span>
+        <button class="suggest-more" type="button" id="btnRoomMore" data-i18n-attr="title:suggest.more">
+          <svg><use href="#i-again"/></svg>
+        </button>
+      </div>
+      <div class="suggest-row" id="roomSuggestRow"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ NAME ============ -->
+<div class="veil" id="veilName" hidden>
+  <div class="sheet sheet-narrow" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+    <h2 class="sheet-title" id="nameTitle"></h2>
+    <p class="sheet-lead" id="nameLead"></p>
+    <form class="field-form" id="formName" novalidate>
+      <div class="field">
+        <label class="field-label" for="inpName" data-i18n="name.label"></label>
+        <input class="input" id="inpName" type="text" autocomplete="nickname" maxlength="24" required>
+        <p class="field-error" id="errName" hidden></p>
+      </div>
+      <div class="suggest suggest-flat">
+        <div class="suggest-head">
+          <span class="suggest-label" data-i18n="suggest.label"></span>
+          <button class="suggest-more" type="button" id="btnNameMore" data-i18n-attr="title:suggest.more">
+            <svg><use href="#i-again"/></svg>
+          </button>
+        </div>
+        <div class="suggest-row" id="nameSuggestRow"></div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-ghost" type="button" id="btnNameCancel" data-i18n="name.cancel" hidden></button>
+        <button class="btn btn-accent" type="submit" id="btnNameSave"></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================================ VERBINDUNG ====== -->
+<div class="veil" id="veilLink" hidden>
+  <div class="sheet sheet-narrow sheet-notice" role="status">
+    <div class="sheet-mark"><span class="logomark"><svg><use href="#i-play"/></svg></span></div>
+    <h2 class="sheet-title" data-i18n="link.title"></h2>
+    <p class="sheet-lead" id="linkLead"></p>
+  </div>
+</div>
+
+<!-- ============================================================ UPLOAD ========== -->
+<div class="veil" id="veilUpload" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="upTitle">
+    <div class="sheet-head">
+      <h2 class="sheet-title" id="upTitle" data-i18n="up.title"></h2>
+      <div class="sheet-head-actions">
+        <button class="icon-btn" type="button" id="btnUpMin" data-i18n-attr="title:up.min" hidden>
+          <svg><use href="#i-minimize"/></svg></button>
+        <button class="icon-btn" type="button" id="btnUpClose" data-i18n-attr="title:up.close">
+          <svg><use href="#i-close"/></svg></button>
+      </div>
+    </div>
+
+    <div id="upPick">
+      <label class="drop" id="drop" for="inpFile">
+        <span class="drop-icon"><svg><use href="#i-upload"/></svg></span>
+        <span class="drop-title" data-i18n="up.drop"></span>
+        <span class="drop-sub" data-i18n="up.dropSub"></span>
+        <input type="file" id="inpFile" multiple
+               accept="video/mp4,video/webm,video/ogg,video/quicktime,.mp4,.m4v,.webm,.ogv,.ogg,.mov" hidden>
+      </label>
+      <p class="field-error" id="errFile" hidden></p>
+    </div>
+
+    <div id="upRun" hidden>
+      <div class="bar"><div class="bar-fill" id="upBar"></div></div>
+      <div class="up-meta">
+        <span class="mono" id="upPct">0 %</span>
+        <span class="mono" id="upSpeed"></span>
+        <span class="mono" id="upEta"></span>
+      </div>
+      <ul class="up-list" id="upList"></ul>
+      <div class="sheet-actions">
+        <button class="btn btn-ghost" type="button" id="btnUpAbort" data-i18n="up.abort"></button>
+        <button class="btn btn-soft" type="button" id="btnUpMin2" data-i18n="up.keep"></button>
+      </div>
+    </div>
+
+    <div id="upDone" hidden>
+      <div class="done">
+        <span class="done-icon"><svg><use href="#i-check"/></svg></span>
+        <p class="done-text" id="doneText"></p>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-accent" type="button" id="btnUpFinish" data-i18n="up.finish"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ APP ============= -->
+<div class="app" id="app" hidden>
+
+  <header class="topbar">
+    <a class="brand" id="brandLink">
+      <span class="logomark"><svg><use href="#i-play"/></svg></span>
+      <span class="brand-name">Watch Together</span>
+    </a>
+
+    <button class="room-chip" id="btnCopyLink" data-i18n-attr="title:top.copy">
+      <span class="room-dot" aria-hidden="true"></span>
+      <span class="room-name" id="roomName"></span>
+      <svg class="room-copy"><use href="#i-copy"/></svg>
+    </button>
+
+    <div class="topbar-right">
+      <button class="btn btn-accent btn-sm" id="btnAdd">
+        <svg><use href="#i-plus"/></svg><span data-i18n="top.add"></span>
+      </button>
+      <button class="icon-btn" id="btnTheme" data-i18n-attr="title:top.theme">
+        <svg class="ico-light"><use href="#i-moon"/></svg>
+        <svg class="ico-dark"><use href="#i-sun"/></svg>
+      </button>
+      <button class="me-chip" id="btnRename" data-i18n-attr="title:top.rename">
+        <span class="avatar" id="meAvatar">–</span>
+        <span class="me-name" id="meName"></span>
+        <svg class="me-edit"><use href="#i-pencil"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <section class="stage-col">
+      <div class="stage" id="stage">
+        <video class="stage-video" id="video" playsinline preload="metadata" hidden></video>
+
+        <div class="stage-empty" id="stageEmpty">
+          <span class="empty-icon"><svg><use href="#i-queue"/></svg></span>
+          <p class="empty-title" data-i18n="stage.empty.title"></p>
+          <p class="empty-sub" data-i18n="stage.empty.sub"></p>
+          <button class="btn btn-accent" id="btnAddEmpty">
+            <svg><use href="#i-plus"/></svg><span data-i18n="top.add"></span>
+          </button>
+        </div>
+
+        <button class="stage-tap" id="stageTap" data-i18n-attr="aria-label:stage.tap"></button>
+
+        <div class="stage-badge" id="badgeSync" hidden>
+          <span class="pulse" aria-hidden="true"></span>
+          <span data-i18n="stage.sync"></span>
+        </div>
+
+        <div class="stage-badge stage-badge-warn" id="badgeLink" hidden>
+          <span class="pulse" aria-hidden="true"></span>
+          <span data-i18n="link.lost"></span>
+        </div>
+
+        <div class="stage-start" id="stageStart" hidden>
+          <button class="big-play" id="btnBigPlay" data-i18n-attr="aria-label:ctl.play">
+            <svg><use href="#i-play"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="controls" id="controls">
+        <button class="icon-btn icon-btn-lg" id="btnPlay" data-i18n-attr="title:ctl.play">
+          <svg class="ico-play"><use href="#i-play"/></svg>
+          <svg class="ico-pause"><use href="#i-pause"/></svg>
+        </button>
+
+        <span class="mono time" id="tCur">0:00</span>
+
+        <div class="scrub" id="scrub" role="slider" tabindex="0"
+             data-i18n-attr="aria-label:ctl.seek"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="scrub-track">
+            <div class="scrub-fill" id="scrubFill"></div>
+            <div class="scrub-knob" id="scrubKnob"></div>
+          </div>
+          <div class="scrub-peers" id="scrubPeers"></div>
+        </div>
+
+        <span class="mono time time-total" id="tDur">0:00</span>
+
+        <div class="vol">
+          <button class="icon-btn" id="btnMute" data-i18n-attr="title:ctl.mute">
+            <svg class="ico-on"><use href="#i-sound"/></svg>
+            <svg class="ico-off"><use href="#i-mute"/></svg>
+          </button>
+          <input class="vol-range" id="volRange" type="range" min="0" max="100" value="50"
+                 data-i18n-attr="aria-label:ctl.volume">
+        </div>
+
+        <button class="icon-btn" id="btnFull" data-i18n-attr="title:ctl.full"><svg><use href="#i-full"/></svg></button>
+      </div>
+
+      <div class="now" id="now">
+        <div class="now-main">
+          <h2 class="now-title" id="nowTitle"></h2>
+          <p class="now-by" id="nowBy"></p>
+        </div>
+        <button class="btn btn-soft btn-sm" id="btnTakeover" hidden>
+          <svg><use href="#i-crown"/></svg><span data-i18n="now.takeover"></span>
+        </button>
+      </div>
+    </section>
+
+    <aside class="side">
+
+      <section class="panel">
+        <header class="panel-head">
+          <svg class="panel-ico"><use href="#i-users"/></svg>
+          <h2 class="panel-title" data-i18n="viewers.title"></h2>
+          <span class="count" id="viewerCount">0</span>
+        </header>
+        <div class="table-wrap">
+          <table class="viewers">
+            <thead><tr>
+              <th scope="col" data-i18n="viewers.name"></th>
+              <th scope="col" class="ta-r" data-i18n="viewers.pos"></th>
+            </tr></thead>
+            <tbody id="viewerRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel panel-grow">
+        <header class="panel-head">
+          <svg class="panel-ico"><use href="#i-queue"/></svg>
+          <h2 class="panel-title" data-i18n="queue.title"></h2>
+          <span class="count" id="queueCount">0</span>
+        </header>
+        <ol class="queue" id="queue"></ol>
+        <div class="queue-empty" id="queueEmpty" hidden>
+          <p data-i18n="queue.empty"></p>
+          <button class="btn btn-soft btn-sm" id="btnAddQueue">
+            <svg><use href="#i-plus"/></svg><span data-i18n="top.add"></span>
+          </button>
+        </div>
+      </section>
+
+    </aside>
+  </main>
+
+</div>
+
+<!-- Mini-Fortschritt, wenn das Upload-Fenster weggelegt wurde -->
+<div class="mini" id="mini" hidden>
+  <div class="mini-top">
+    <span class="mini-name" id="miniName"></span>
+    <button class="icon-btn icon-btn-xs" id="btnMiniOpen" data-i18n-attr="title:up.open"><svg><use href="#i-full"/></svg></button>
+  </div>
+  <div class="bar bar-thin"><div class="bar-fill" id="miniBar"></div></div>
+  <div class="mini-meta"><span class="mono" id="miniPct">0 %</span><span class="mono" id="miniEta"></span></div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="assets/js/i18n.js"></script>
+<script src="assets/js/names.js"></script>
+<script src="assets/js/media.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/net.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

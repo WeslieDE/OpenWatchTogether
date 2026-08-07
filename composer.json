@@ -1,0 +1,23 @@
+{
+    "name": "weslie/watch-together",
+    "description": "Watch Together - watch your own videos with friends, in sync, in the same room.",
+    "type": "project",
+    "license": "MIT",
+    "homepage": "https://github.com/WeslieDE/OpenWatchTogether",
+    "require": {
+        "php": ">=8.0",
+        "ext-pdo": "*",
+        "ext-json": "*",
+        "workerman/workerman": "^4.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "tk\\weslie\\WatchTogether\\": "src/"
+        }
+    },
+    "config": {
+        "vendor-dir": "vendor",
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

@@ -1,0 +1,212 @@
+<div align="center">
+
+# 🍿 Watch Together
+
+**Watch your own videos with your friends — in perfect sync, in the browser, on your own server.**
+
+Someone drops a video in, everyone gets the same picture at the same moment.
+Pause it, come back tomorrow, and it picks up exactly where you left off.
+
+[![Self-hosted](https://img.shields.io/badge/self--hosted-yes-1f9d55)](docs/SETUP.md)
+[![Docker](https://img.shields.io/badge/docker-one%20container-2496ed)](#-quick-start)
+[![PHP](https://img.shields.io/badge/PHP-8.0%2B-777bb4)](docs/SETUP.md#requirements)
+[![No account needed](https://img.shields.io/badge/accounts-none-orange)](#-what-is-this)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+<img src="docs/player%20(style%20dark).jpg" alt="A Watch Together room: player, viewer list and shared queue" width="900">
+
+</div>
+
+---
+
+## 🎬 What is this?
+
+Watch Together is a tiny self-hosted watch-party server for **your own video files**.
+
+No accounts, no sign-up, no streaming service in the middle. Start it, send a link
+to your friends, and everyone lands in the same room watching the same video at
+the same second — whether they're in the next room or on the other side of the
+country.
+
+It's built for the simple case: *"I have this video on my disk, let's watch it
+together tonight."*
+
+---
+
+## ✨ Features
+
+### 👥 Watch with as many people as you like
+Rooms have no size limit. Everybody who opens the link joins instantly — no
+account, no invite, no e-mail address. Pick a name and you're in.
+
+### 🔗 Rooms are just links
+Every room has its own URL. Copy it, paste it into your chat, done. If the room
+doesn't exist yet, it's created the moment the first person walks in.
+
+### ⏱️ Playback stays in sync — by itself
+One person leads, everyone else follows automatically. Play, pause and seeking are
+shared instantly.
+
+If someone drifts a little out of step, their player quietly speeds up or slows
+down by 20% until they're back in line — no visible jump, no "3, 2, 1, play!"
+countdown. Only when the gap gets really big does it snap to the right spot and
+say so.
+
+### 👑 Anyone can take the lead
+There's no fixed host. Whoever hits play, pause or the timeline takes over
+automatically, and the viewer list shows who's currently setting the pace.
+
+### ⏸️ Pause today, continue tomorrow
+Stop halfway through a movie, close the tab, go to bed. When someone opens the
+room again, the video is waiting **at exactly the position you left it** — paused,
+ready to go.
+
+### 📤 Upload anything — no file size limit
+Videos go up in small pieces, so there's **no 2 GB wall, no PHP upload limit to
+tune, nothing to configure**. A 30 GB movie works the same as a 2-minute clip.
+
+You get a real progress bar with speed and time remaining, and you can upload
+several files at once. Want to keep watching while it uploads? Minimize the dialog
+— the progress keeps ticking away in the corner.
+
+### 📋 A shared queue
+Uploads appear in everyone's queue *while they're still uploading*, with progress
+and the name of whoever's adding them. Each entry shows a thumbnail, its runtime
+and who brought it. Anyone can pick what plays next or remove something.
+
+When a video finishes, the next one starts automatically.
+
+### 🙋 See where everyone is
+The viewer list shows every person in the room and their exact position in the
+video, plus a marker on the timeline. Anyone lagging behind is highlighted, so you
+can see at a glance if someone's connection is struggling.
+
+### 🔊 Your volume is *your* volume
+Everything is synced except the sound. Turn it down, mute it, crank it up — it
+only affects you, and your browser remembers it for next time.
+
+### 🌗 Light & dark, English & German
+The interface follows your system theme and your browser language out of the box,
+and you can override either. Your choices are remembered locally.
+
+### 🍓 Names, without the thinking
+Can't come up with a room name? The app suggests some. Rooms get everyday objects
+(`Kugelschreiber43`, `Uhr12`), people get fruit (`Erdbeere93`, `Banane33`).
+
+---
+
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/player%20(style%20dark).jpg" alt="Player in dark mode"></td>
+    <td width="50%"><img src="docs/player%20(style%20lite).jpg" alt="Player in light mode"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Dark mode</b></td>
+    <td align="center"><b>Light mode</b></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/input-room-name%20(style%20dark).png" alt="Joining a room in dark mode"></td>
+    <td width="50%"><img src="docs/input-room-name%20(style%20lite).png" alt="Joining a room in light mode"></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><b>Joining a room — a name is all it takes</b></td>
+  </tr>
+</table>
+
+---
+
+## 🚀 Quick start
+
+Everything runs in **one container**. No database to set up, no volume to mount,
+no reverse proxy needed to get going.
+
+```bash
+git clone https://github.com/WeslieDE/OpenWatchTogether.git
+cd OpenWatchTogether
+
+docker build -t watch-together .
+docker run --rm -p 8080:80 watch-together
+```
+
+Open <http://localhost:8080>, pick a room name, pick your name — done. Send the
+URL from your address bar to whoever should join.
+
+> 📖 **[Full setup guide →](docs/SETUP.md)**
+> Docker Compose, reverse proxy & HTTPS, manual PHP installation, every
+> configuration option, technical details and troubleshooting.
+
+---
+
+## 💡 Good to know
+
+**Everything is deleted when the service restarts — on purpose.** A watch party
+leaves no trace: no disk slowly filling up, no volume to mount, no backups to
+think about. As long as the service keeps running, your room stays exactly as you
+left it, including the spot you paused at.
+→ [Details](docs/SETUP.md#nothing-survives-a-restart--and-why-thats-good)
+
+**Want a room that's never empty?** Put videos into `default/<roomname>/` and they
+show up in the queue the first time somebody enters that room.
+→ [Details](docs/SETUP.md#pre-filling-new-rooms-with-the-default-folder)
+
+**Formats:** anything the browser plays directly — MP4, WebM, OGG. Nothing is
+transcoded, so playback starts instantly. MKV and AVI are politely refused.
+
+**Privacy:** videos are renamed to random names, stored outside the web root and
+only ever served through the API. Your name, theme and volume never leave your
+browser.
+
+**Under the hood:** one HTML page, a plain PHP API for uploads and rooms, and a
+long-running PHP process handling the live connection over WebSockets.
+→ [Details](docs/SETUP.md#technical-details)
+
+---
+
+## ❓ FAQ
+
+**Is there really no file size limit?**
+Correct. Uploads are split into chunks, so PHP's `upload_max_filesize` never gets
+in the way. Set `WT_MAX_BYTES` if you *want* a limit for your installation.
+
+**Can I cancel an upload?**
+Any time — individually or all at once, and the queue entry disappears for
+everyone.
+
+**Do I need accounts or a database server?**
+Neither. No login, no PostgreSQL, no Redis — just the container.
+
+**Does it work on a phone?**
+Yes, the interface adapts. Mobile browsers still need one manual tap to start
+playback the first time.
+
+**Can we watch YouTube or Netflix together?**
+No — this is for your own video files, not for streaming services.
+
+**How many people fit in a room?**
+There's no built-in limit. What matters is your server's upload bandwidth, since
+everyone streams the video from it.
+
+---
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome. If you're reporting a sync problem, it helps
+a lot to mention your browser, how many people were in the room, and whether
+you're running behind a reverse proxy.
+
+---
+
+## 📄 License
+
+[MIT](LICENSE) — do whatever you like with it: use it, change it, share it, ship
+it. Provided **as is**, without any warranty.
+
+---
+
+<div align="center">
+
+Made for movie nights that shouldn't need a countdown. 🎬
+
+</div>

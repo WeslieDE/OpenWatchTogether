@@ -1,0 +1,13 @@
+# Im Bild liegt ffmpeg aus den Paketquellen. Die portablen Windows-Binaerdateien
+# aus der Entwicklung haben dort nichts zu suchen.
+tools/
+
+# Wird im Bild selbst installiert.
+vendor/
+composer.phar
+
+.git/
+.gitignore
+.idea/
+*.md
+config.local.php

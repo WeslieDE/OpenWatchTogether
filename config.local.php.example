@@ -1,0 +1,26 @@
+<?php
+/**
+ * Eigene Einstellungen fuer die Entwicklung. Datei nach config.local.php
+ * kopieren und anpassen. Sie hat Vorrang vor allem anderen.
+ *
+ * Im Container wird nichts davon gebraucht, dort steht alles in
+ * Umgebungsvariablen (WT_DATA_DIR, WT_WS_URL, WT_WS_PORT, ...).
+ */
+declare(strict_types=1);
+
+return [
+    /* Wo Videos, Vorschaubilder und die Datenbanken der Raeume liegen.
+       Vorgabe: ~/.weslie/WatchTogether */
+    // 'dataDir'  => 'C:/Users/ich/.weslie/WatchTogether',
+    // 'mediaDir' => 'C:/Users/ich/.weslie/WatchTogether/media',
+
+    /* Adresse der Live-Verbindung fuer den Browser.
+       leer     = ws://<host>:<wsPort>, so laeuft es in der Entwicklung
+       '/ws'    = hinter demselben Webserver, so laeuft es im Container */
+    // 'wsUrl'  => '',
+    // 'wsPort' => 8081,
+
+    /* ffmpeg. Ohne Angabe wird tools/ffmpeg/bin genommen, sonst der PATH. */
+    // 'ffmpeg'  => 'C:/ffmpeg/bin/ffmpeg.exe',
+    // 'ffprobe' => 'C:/ffmpeg/bin/ffprobe.exe',
+];

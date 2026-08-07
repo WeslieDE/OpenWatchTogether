@@ -1,0 +1,25 @@
+# Composer packages - installed with `composer install`
+/vendor/
+composer.phar
+
+# Portable ffmpeg for local development on Windows
+/tools/
+
+# Local settings, never shared
+config.local.php
+
+# Internal planning notes
+/planung.md
+
+# Stored data, should it ever end up inside the project folder
+/media/
+/data/
+
+# IDE
+/.idea/
+*.iml
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
