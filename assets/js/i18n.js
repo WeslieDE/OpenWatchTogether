@@ -25,6 +25,7 @@
       "room.hint":        "Buchstaben, Zahlen und Bindestriche.",
       "room.submit":      "Weiter",
       "room.err.empty":   "Bitte einen Namen eingeben.",
+      "room.github":      "Watch Together auf GitHub",
 
       "suggest.label":    "Vorschläge",
       "suggest.more":     "Andere Vorschläge",
@@ -132,6 +133,7 @@
       "room.hint":        "Letters, numbers and hyphens.",
       "room.submit":      "Continue",
       "room.err.empty":   "Please enter a name.",
+      "room.github":      "Watch Together on GitHub",
 
       "suggest.label":    "Suggestions",
       "suggest.more":     "Other suggestions",
