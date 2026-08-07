@@ -234,6 +234,45 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .field-error { font-size: 12.5px; color: var(--accent); font-weight: 550; }
 .field-error[hidden] { display: none; }
 
+/* Gruppe von Feldern, die zusammengehoeren. Eine Haarlinie trennt sie vom
+   Block darueber, sonst schwimmt alles im gleichen Abstand. */
+.group { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid var(--line); }
+.group-head { display: grid; gap: 3px; }
+.group-title { font-size: 14px; font-weight: 600; letter-spacing: -.012em; }
+.group-lead { font-size: 12.5px; color: var(--text-2); max-width: 62ch; }
+.group-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+
+/* Schalter. Ein gewoehnliches Kaestchen, nur anders gezeichnet. Die ganze
+   Zeile ist die Beschriftung, also schaltet auch ein Klick daneben. */
+.switch-row {
+  display: flex; align-items: center; gap: 18px;
+  padding: 14px; cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  transition: border-color .18s var(--ease), background-color .18s var(--ease);
+}
+.switch-row:hover { border-color: var(--line-strong); }
+.switch-row:has(.switch:focus-visible) { border-color: var(--accent); }
+.switch-main { display: grid; gap: 3px; min-width: 0; }
+.switch-label { font-size: 14px; font-weight: 550; }
+.switch-hint { font-size: 12.5px; color: var(--text-2); }
+
+.switch {
+  appearance: none; -webkit-appearance: none;
+  position: relative; flex: none;
+  width: 42px; height: 24px; margin: 0; border-radius: var(--r-pill);
+  background: var(--line-strong); cursor: pointer;
+  transition: background-color .18s var(--ease);
+}
+.switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgb(23 23 26 / .35);
+  transition: transform .18s var(--ease);
+}
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(18px); }
+
 .suggest { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
 .suggest-flat { margin-top: 0; padding-top: 0; border-top: 0; }
 .suggest-head { display: flex; align-items: center; gap: 4px; }

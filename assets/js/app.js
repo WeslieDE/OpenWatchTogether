@@ -64,6 +64,8 @@
     target: null,         /* zuletzt erwartete Zeit des Taktgebers */
     targetAt: 0,
     queue: [],
+    /* Einstellungen des Raumes. Gelten fuer alle und kommen vom Server. */
+    settings: { keep: false, opening: 0, ending: 0 },
     pending: [],          /* laufende Uploads, eigene und fremde */
     jobs: [],             /* eigene Uploads mit Datei und Fortschritt */
     current: null,
@@ -90,6 +92,11 @@
     nameSuggestRow: $("nameSuggestRow"), btnNameMore: $("btnNameMore"),
 
     veilLink: $("veilLink"), linkLead: $("linkLead"),
+
+    veilSettings: $("veilSettings"), formSettings: $("formSettings"),
+    setKeep: $("setKeep"), setOpening: $("setOpening"), setEnding: $("setEnding"),
+    errSettings: $("errSettings"), btnSettings: $("btnSettings"),
+    btnSetClose: $("btnSetClose"), btnSetCancel: $("btnSetCancel"),
 
     veilUpload: $("veilUpload"), upPick: $("upPick"), upRun: $("upRun"), upDone: $("upDone"),
     drop: $("drop"), inpFile: $("inpFile"), errFile: $("errFile"),
@@ -186,8 +193,8 @@
   function closeVeil(node) { node.hidden = true; }
 
   function veilOpen() {
-    return !(el.veilRoom.hidden && el.veilName.hidden &&
-             el.veilUpload.hidden && el.veilLink.hidden);
+    return !(el.veilRoom.hidden && el.veilName.hidden && el.veilUpload.hidden &&
+             el.veilLink.hidden && el.veilSettings.hidden);
   }
 
   function store(key, value) {
@@ -259,6 +266,7 @@
         S.remote = { playing: d.video.playing, t: d.video.t, at: now() };
         S.pending = (d.uploads || []).slice();
         S.queue = (d.queue || []).slice();
+        S.settings = cleanSettings(d.settings);
         S.nowId = d.now || null;
         enterApp();
         /* Der mitgeschickte Stand gehoert zum mitgeschickten Video. */
@@ -334,6 +342,16 @@
       /* Die Warteschlange hat sich geaendert. */
       case "queue":
         applyQueue(d.items || []);
+        break;
+
+      /* Jemand hat an den Raumeinstellungen gedreht. Sie gelten fuer alle,
+         also kommt der neue Stand auch bei dem an, der ihn geschickt hat. */
+      case "settings":
+        S.settings = cleanSettings(d);
+        logAdd("log.settings", "", logWho(d.byId, d.by));
+        toast(d.byId === S.me.id
+          ? t("toast.settingsSaved")
+          : t("toast.settings", { name: d.by }), "i-sliders");
         break;
 
       /* Jemand laedt etwas hoch. Der Eintrag steht sofort in der Liste. */
@@ -1451,6 +1469,83 @@
     renderQueue();
     if (S.current) el.nowBy.textContent = byLine(S.current, "now.by");
   }
+
+  /* --------------------------------------------------- Raumeinstellungen */
+
+  /* Sie gehoeren dem Raum, nicht dem Browser: sie liegen in seiner Datenbank,
+     kommen mit dem "welcome" herein und gelten fuer alle gleich. Aendern darf
+     sie jeder, wie auch jeder ein Video entfernen darf. */
+
+  function cleanSettings(raw) {
+    var v = raw || {};
+    return {
+      keep:    !!v.keep,
+      opening: clamp(Number(v.opening) || 0, 0, 3600),
+      ending:  clamp(Number(v.ending) || 0, 0, 3600)
+    };
+  }
+
+  /* Eine Zeitangabe, wie sie jemand hinschreibt: "1:30", "90" oder gar
+     nichts. Alles andere ist ein Vertipper und wird gemeldet. */
+  function parseSpan(raw) {
+    var v = String(raw).trim().replace(",", ".");
+    if (v === "") return 0;
+
+    var parts = v.split(":");
+    if (parts.length > 2) return null;
+    for (var i = 0; i < parts.length; i++) {
+      if (!/^\d+(\.\d+)?$/.test(parts[i])) return null;
+    }
+
+    var secs = parts.length === 2
+      ? parseInt(parts[0], 10) * 60 + parseFloat(parts[1])
+      : parseFloat(parts[0]);
+
+    if (parts.length === 2 && parseFloat(parts[1]) >= 60) return null;
+    if (!isFinite(secs)) return null;
+    return Math.min(3600, secs);
+  }
+
+  /* Nichts eingestellt bleibt ein leeres Feld, nicht "0:00". */
+  function spanText(secs) { return secs > 0 ? tc(secs) : ""; }
+
+  function openSettings() {
+    el.setKeep.checked  = S.settings.keep;
+    el.setOpening.value = spanText(S.settings.opening);
+    el.setEnding.value  = spanText(S.settings.ending);
+    el.errSettings.hidden = true;
+    openVeil(el.veilSettings, el.setKeep);
+  }
+
+  function closeSettings() { closeVeil(el.veilSettings); }
+
+  el.btnSettings.addEventListener("click", openSettings);
+  el.btnSetClose.addEventListener("click", closeSettings);
+  el.btnSetCancel.addEventListener("click", closeSettings);
+
+  doc.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !el.veilSettings.hidden) closeSettings();
+  });
+
+  el.formSettings.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    var opening = parseSpan(el.setOpening.value);
+    var ending  = parseSpan(el.setEnding.value);
+    if (opening === null || ending === null) {
+      el.errSettings.textContent = t("set.err.time");
+      el.errSettings.hidden = false;
+      return;
+    }
+    el.errSettings.hidden = true;
+
+    var next = { keep: el.setKeep.checked, opening: opening, ending: ending };
+    if (!send("settings", next)) { toast(t("toast.failed")); return; }
+
+    /* Der Server bestaetigt gleich darauf mit dem endgueltigen Stand, samt
+       Hinweis und Protokolleintrag. */
+    closeSettings();
+  });
 
   /* ------------------------------------------------------------- Sitzung */
 
