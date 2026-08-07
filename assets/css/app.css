@@ -634,10 +634,23 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 /* Eigene Hoehe, nicht die der Zuschauer: das Protokoll bleibt auch auf
    schmalen Geraeten ein Fenster und waechst nicht ins Endlose. */
 .log-wrap { max-height: 236px; overflow-y: auto; }
+/* Feste Spalten, sonst zieht ein langer Titel die Zeile auseinander, statt
+   sich abschneiden zu lassen. */
+.log { table-layout: fixed; }
 .log-col-at  { width: 96px; }
 .log-col-who { width: 30%; }
 .log-at { color: var(--text-2); font-size: 13px; white-space: nowrap; }
-.log-what { color: var(--text); }
+.log-what { color: var(--text); overflow: hidden; }
+
+/* Der Titel steht farbig im Satz und weicht als Einziger zurueck, wenn der
+   Platz nicht reicht. Der Satz drumherum bleibt immer ganz zu lesen. */
+.log-line { display: flex; align-items: baseline; min-width: 0; white-space: pre; }
+.log-line > span { flex: none; }
+.log-line > .log-title {
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis;
+  color: var(--accent); font-weight: 550;
+}
 .log-nobody { color: var(--text-3); }
 .log-none td { padding: 24px 14px; text-align: center; color: var(--text-3); }
 

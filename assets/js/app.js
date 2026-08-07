@@ -896,6 +896,31 @@
       { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }
 
+  /* Der Titel hebt sich vom Satz drumherum ab und wird abgeschnitten, statt
+     eine zweite Zeile in der Zeile anzufangen. Dafuer wird die Vorlage an der
+     Stelle des Titels geteilt, statt ihn einzusetzen: nur so laesst sich
+     genau dieses Stueck anders zeichnen. */
+  var TITLE_SLOT = "{title}";
+
+  function logWhat(entry) {
+    var raw = t(entry.key);
+    var at = entry.title ? raw.indexOf(TITLE_SLOT) : -1;
+
+    if (at < 0) {
+      return '<span class="log-line"><span>' +
+        esc(t(entry.key, { title: entry.title })) + "</span></span>";
+    }
+
+    /* Der volle Name bleibt am Knoten haengen, damit er sich lesen laesst,
+       wenn er nicht ganz hinpasst. */
+    return '<span class="log-line">' +
+      "<span>" + esc(raw.slice(0, at)) + "</span>" +
+      '<span class="log-title" title="' + esc(entry.title) + '">' +
+        esc(entry.title) + "</span>" +
+      "<span>" + esc(raw.slice(at + TITLE_SLOT.length)) + "</span>" +
+    "</span>";
+  }
+
   function renderLog() {
     el.logCount.textContent = String(logbook.length);
 
@@ -918,7 +943,7 @@
 
       return "<tr>" +
         '<td class="log-at mono">' + esc(logTime(entry.at)) + "</td>" +
-        '<td class="log-what">' + esc(t(entry.key, { title: entry.title })) + "</td>" +
+        '<td class="log-what">' + logWhat(entry) + "</td>" +
         "<td>" + who + "</td>" +
       "</tr>";
     }).join("");
