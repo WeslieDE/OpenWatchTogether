@@ -50,11 +50,9 @@
       "stage.empty.sub":   "Leg ein Video dazu, dann geht es für alle gleichzeitig los.",
       "stage.sync":        "Wird angeglichen",
       "stage.wait":        "Warte auf alle · {n}/{total} bereit",
-      "stage.tap":         "Abspielen oder pausieren",
 
       "ctl.play":   "Abspielen",
       "ctl.pause":  "Pause",
-      "ctl.seek":   "Position im Video",
       "ctl.mute":   "Ton aus",
       "ctl.volume": "Lautstärke",
       "ctl.full":   "Vollbild",
@@ -124,6 +122,7 @@
       "toast.peerLeft":      "{name} ist weg",
       "toast.peerControl":   "{name} hat die Steuerung übernommen",
       "toast.blocked":       "Einmal tippen, dann läuft es mit.",
+      "toast.noTap":         "Play und Pause laufen über die Leiste unter dem Video. Doppelklick schaltet auf Vollbild.",
       "toast.badVideo":      "„{name}“ ist kein abspielbares Video und wurde wieder entfernt.",
       "toast.failed":        "Das hat nicht geklappt.",
 
@@ -168,11 +167,9 @@
       "stage.empty.sub":   "Add a video and it starts for everyone at the same time.",
       "stage.sync":        "Catching up",
       "stage.wait":        "Waiting for everyone · {n}/{total} ready",
-      "stage.tap":         "Play or pause",
 
       "ctl.play":   "Play",
       "ctl.pause":  "Pause",
-      "ctl.seek":   "Position in the video",
       "ctl.mute":   "Mute",
       "ctl.volume": "Volume",
       "ctl.full":   "Full screen",
@@ -242,6 +239,7 @@
       "toast.peerLeft":      "{name} left",
       "toast.peerControl":   "{name} took control",
       "toast.blocked":       "Tap once and it plays along.",
+      "toast.noTap":         "Play and pause live in the bar below the video. Double-click switches to full screen.",
       "toast.badVideo":      "“{name}” is not a playable video and was removed again.",
       "toast.failed":        "That did not work.",
 

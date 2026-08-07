@@ -872,8 +872,6 @@
     var pct = len ? (pos / len) * 100 : 0;
     el.scrubFill.style.width = pct + "%";
     el.scrubKnob.style.left = pct + "%";
-    el.scrub.setAttribute("aria-valuenow", Math.round(pct));
-    el.scrub.setAttribute("aria-valuetext", tc(pos) + " / " + tc(len));
     el.tCur.textContent = tc(pos);
     el.tDur.textContent = tc(len);
   }
@@ -1126,21 +1124,30 @@
       if (el.scrub.hasPointerCapture(e.pointerId)) el.scrub.releasePointerCapture(e.pointerId);
     } catch (err) { /* nichts zu loesen */ }
   });
-  el.scrub.addEventListener("keydown", function (e) {
-    if (!surface.ready) return;
-    var step = e.shiftKey ? 30 : 5;
-    if (e.key === "ArrowRight") { doSeek(surface.position + step); e.preventDefault(); }
-    if (e.key === "ArrowLeft")  { doSeek(surface.position - step); e.preventDefault(); }
-    if (e.key === " " || e.key === "Enter") { togglePlay(); e.preventDefault(); }
-  });
-
   /* ------------------------------------------------------------- Bedienung */
 
   el.btnPlay.addEventListener("click", togglePlay);
-  el.stageTap.addEventListener("click", togglePlay);
   el.btnBigPlay.addEventListener("click", function (e) { e.stopPropagation(); doPlay(); });
-  el.stageStart.addEventListener("click", function () { doPlay(); });
   el.btnTakeover.addEventListener("click", function () { takeControl(false); });
+
+  /* Das Bild selbst steuert nichts. Zu leicht rutscht sonst jemand aus, und
+     der ganze Raum steht. Ein Klick sagt nur, wo die Bedienung liegt, ein
+     Doppelklick schaltet auf Vollbild. Der erste Klick eines Doppelklicks
+     wartet deshalb kurz ab. */
+  var tapTimer = 0;
+
+  el.stageTap.addEventListener("click", function () {
+    if (tapTimer) return;
+    tapTimer = global.setTimeout(function () {
+      tapTimer = 0;
+      toast(t("toast.noTap"), "i-play");
+    }, 260);
+  });
+
+  el.stageTap.addEventListener("dblclick", function () {
+    if (tapTimer) { global.clearTimeout(tapTimer); tapTimer = 0; }
+    toggleFullscreen();
+  });
 
   /* Ton bleibt bei jedem selbst, geht nie ueber die Leitung und wird im
      Browser gemerkt. */
@@ -1159,10 +1166,12 @@
 
   el.btnMute.addEventListener("click", function () { setMuted(!surface.muted); });
 
-  el.btnFull.addEventListener("click", function () {
+  function toggleFullscreen() {
     if (doc.fullscreenElement) doc.exitFullscreen();
     else if (el.stage.requestFullscreen) el.stage.requestFullscreen();
-  });
+  }
+
+  el.btnFull.addEventListener("click", toggleFullscreen);
 
   el.queue.addEventListener("click", function (e) {
     var stop = e.target.closest("[data-stop]");
@@ -1175,12 +1184,6 @@
     if (S.current && S.current.id === id) return;
     var item = itemById(id);
     if (item) { takeControl(true); loadItem(item); }
-  });
-
-  doc.addEventListener("keydown", function (e) {
-    if (e.target.matches("input, textarea")) return;
-    if (el.app.hidden || veilOpen()) return;
-    if (e.key === " " || e.code === "Space") { togglePlay(); e.preventDefault(); }
   });
 
   /* ---------------------------------------------------------------- Raum */

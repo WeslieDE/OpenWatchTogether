@@ -209,7 +209,9 @@
           </button>
         </div>
 
-        <button class="stage-tap" id="stageTap" data-i18n-attr="aria-label:stage.tap"></button>
+        <!-- Faengt Klicks auf dem Bild ab. Ein Klick steuert bewusst nichts,
+             ein Doppelklick schaltet auf Vollbild. -->
+        <div class="stage-tap" id="stageTap" aria-hidden="true"></div>
 
         <div class="stage-badge" id="badgeSync" hidden>
           <span class="pulse" aria-hidden="true"></span>
@@ -241,9 +243,10 @@
 
         <span class="mono time" id="tCur">0:00</span>
 
-        <div class="scrub" id="scrub" role="slider" tabindex="0"
-             data-i18n-attr="aria-label:ctl.seek"
-             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <!-- Die Zeitleiste hoert nur auf die Maus. Ueber die Tastatur laesst
+             sich das Video bewusst nicht steuern; die Zeiten daneben sagen
+             ohnehin, wo es steht. -->
+        <div class="scrub" id="scrub" aria-hidden="true">
           <div class="scrub-track">
             <div class="scrub-fill" id="scrubFill"></div>
             <div class="scrub-knob" id="scrubKnob"></div>

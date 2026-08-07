@@ -353,7 +353,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 }
 .stage-video[hidden] { display: none; }
 
-.stage-tap { position: absolute; inset: 0; border: 0; background: none; cursor: pointer; }
+.stage-tap { position: absolute; inset: 0; cursor: pointer; }
 .stage-tap[hidden] { display: none; }
 
 .stage-empty {
@@ -368,10 +368,13 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .empty-title { font-size: 16px; font-weight: 600; color: #fff; }
 .empty-sub { font-size: 13.5px; color: #9a9aa4; max-width: 34ch; margin-bottom: 14px; }
 
+/* Der Schleier bleibt durchlaessig: nur der Knopf selbst startet. Daneben
+   zaehlt der Klick als Klick auf das Bild. */
 .stage-start { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center;
-  background: rgb(8 8 10 / .35); }
+  background: rgb(8 8 10 / .35); pointer-events: none; }
 .stage-start[hidden] { display: none; }
 .big-play {
+  pointer-events: auto;
   width: 74px; height: 74px; border-radius: 50%; border: 0; cursor: pointer;
   display: grid; place-items: center;
   background: rgb(255 255 255 / .94); color: #17171a;
@@ -674,9 +677,10 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
   transform: translateX(-50%); display: grid; gap: 8px; pointer-events: none; }
 .toast {
   display: flex; align-items: center; gap: 9px;
-  padding: 9px 15px; border-radius: var(--r-pill);
+  padding: 9px 15px; border-radius: 18px;
   background: var(--surface); border: 1px solid var(--line);
-  box-shadow: var(--shadow-2); font-size: 13.5px; white-space: nowrap;
+  box-shadow: var(--shadow-2); font-size: 13.5px;
+  max-width: min(420px, calc(100vw - 32px));
   animation: toast-in .26s var(--ease) both;
 }
 .toast.is-leaving { animation: toast-out .26s var(--ease) both; }
