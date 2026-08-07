@@ -111,7 +111,7 @@
 
     controls: $("controls"), btnPlay: $("btnPlay"), tCur: $("tCur"), tDur: $("tDur"),
     scrub: $("scrub"), scrubFill: $("scrubFill"), scrubKnob: $("scrubKnob"),
-    scrubPeers: $("scrubPeers"),
+    scrubPeers: $("scrubPeers"), scrubHint: $("scrubHint"),
     btnMute: $("btnMute"), volRange: $("volRange"), btnFull: $("btnFull"),
 
     nowTitle: $("nowTitle"), nowBy: $("nowBy"), btnTakeover: $("btnTakeover"),
@@ -1087,18 +1087,41 @@
     return f * (surface.length || 0);
   }
 
+  /* Die Zeit unter dem Zeiger. Damit laesst sich eine Stelle ansteuern, ohne
+     erst hinzuspringen und dann nachzubessern. Die Blase bleibt innerhalb der
+     Leiste, sonst haengt sie an schmalen Fenstern in der Luft. */
+  function showHint(clientX) {
+    var r = el.scrub.getBoundingClientRect();
+    if (!surface.ready || !r.width) { hideHint(); return; }
+
+    var f = clamp((clientX - r.left) / r.width, 0, 1);
+    el.scrubHint.textContent = tc(f * (surface.length || 0));
+    el.scrubHint.classList.add("is-on");
+
+    var half = el.scrubHint.offsetWidth / 2;
+    el.scrubHint.style.left = clamp(f * r.width, half, Math.max(half, r.width - half)) + "px";
+  }
+
+  function hideHint() { el.scrubHint.classList.remove("is-on"); }
+
   el.scrub.addEventListener("pointerdown", function (e) {
     if (!surface.ready) return;
     dragging = true;
     try { el.scrub.setPointerCapture(e.pointerId); } catch (err) { /* ohne Capture weiter */ }
+    showHint(e.clientX);
     doSeek(scrubToTime(e.clientX));
   });
   el.scrub.addEventListener("pointermove", function (e) {
+    showHint(e.clientX);
     if (!dragging) return;
     doSeek(scrubToTime(e.clientX));
   });
+  el.scrub.addEventListener("pointerleave", function () {
+    if (!dragging) hideHint();
+  });
   el.scrub.addEventListener("pointerup", function (e) {
     dragging = false;
+    hideHint();
     try {
       if (el.scrub.hasPointerCapture(e.pointerId)) el.scrub.releasePointerCapture(e.pointerId);
     } catch (err) { /* nichts zu loesen */ }

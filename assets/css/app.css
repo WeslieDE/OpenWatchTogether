@@ -428,6 +428,19 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 }
 .scrub:hover .scrub-knob, .scrub:focus-visible .scrub-knob { transform: scale(1.25); }
 
+/* Zeit unter dem Zeiger. Sitzt ueber der Leiste und ragt bewusst aus der
+   Steuerung heraus, damit sie den Regler nicht verdeckt. */
+.scrub-hint {
+  position: absolute; left: 0; bottom: calc(100% - 3px);
+  transform: translateX(-50%);
+  padding: 3px 8px; border-radius: 7px;
+  background: var(--text); color: var(--bg);
+  font-size: 11.5px; line-height: 1.45; white-space: nowrap;
+  pointer-events: none; opacity: 0;
+  transition: opacity .14s var(--ease);
+}
+.scrub-hint.is-on { opacity: 1; }
+
 .scrub-peers { position: absolute; inset: 0; pointer-events: none; }
 .peer-tick {
   position: absolute; top: 50%; width: 2px; height: 13px; margin-top: -6.5px;
