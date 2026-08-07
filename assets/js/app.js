@@ -774,8 +774,13 @@
 
     var before = S.settings.ending;
     var len = surface.length;
-    if (before <= 0 || !len || before >= len) return;
-    if (surface.position < len - before) return;
+    if (before <= 0 || !len) return;
+
+    /* Faengt der Abspann vor dem Ende des Vorspanns an, bleibt vom Video
+       nichts uebrig - und die Warteschlange wuerde im Kreis rennen. Solche
+       Angaben werden schlicht nicht angewandt. */
+    var stop = len - before;
+    if (stop <= S.settings.opening || surface.position < stop) return;
 
     endedAt = S.current.id;
     onEnded();
