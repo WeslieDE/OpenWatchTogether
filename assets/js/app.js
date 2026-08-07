@@ -32,6 +32,7 @@
   var STORE_THEME = "wt.theme";
   var STORE_VOL   = "wt.volume";
   var STORE_MUTE  = "wt.muted";
+  var STORE_WIDE  = "wt.wide";
 
   var SYNC_OK   = 0.4;    /* darunter gilt alles als gleich */
   var SYNC_HARD = 20;     /* darueber wird hart gesprungen  */
@@ -113,7 +114,8 @@
     btnBack10: $("btnBack10"), btnFwd10: $("btnFwd10"),
     scrub: $("scrub"), scrubFill: $("scrubFill"), scrubKnob: $("scrubKnob"),
     scrubPeers: $("scrubPeers"), scrubHint: $("scrubHint"),
-    btnMute: $("btnMute"), volRange: $("volRange"), btnFull: $("btnFull"),
+    btnMute: $("btnMute"), volRange: $("volRange"),
+    btnWide: $("btnWide"), btnFull: $("btnFull"),
 
     now: $("now"), nowTitle: $("nowTitle"), nowBy: $("nowBy"), btnTakeover: $("btnTakeover"),
 
@@ -1077,6 +1079,7 @@
     updatePlayUi();
     el.btnFull.setAttribute("title",
       t(doc.fullscreenElement === el.stage ? "ctl.exitFull" : "ctl.full"));
+    applyWide(isWide());
     renderViewers();
     renderQueue();
     renderLog();
@@ -1186,6 +1189,22 @@
   }
 
   el.btnFull.addEventListener("click", toggleFullscreen);
+
+  /* Grosses Bild. Zuschauer und Warteschlange raeumen dann die Spalte rechts
+     und legen sich unter das Video, das Bild bekommt die Breite dazu. Die
+     Wahl bleibt im Browser und geht niemanden sonst etwas an. */
+  function isWide() { return el.app.classList.contains("is-wide"); }
+
+  function applyWide(on) {
+    el.app.classList.toggle("is-wide", on);
+    el.btnWide.setAttribute("title", t(on ? "ctl.narrow" : "ctl.wide"));
+  }
+
+  el.btnWide.addEventListener("click", function () {
+    var on = !isWide();
+    applyWide(on);
+    store(STORE_WIDE, on ? "1" : "0");
+  });
 
   /* Im Vollbild bleibt die Steuerung dieselbe, sie zieht nur um: Titelzeile
      und Bedienleiste haengen sich an die Buehne und legen sich ueber das
@@ -1928,6 +1947,8 @@
     surface.volume = vol / 100;
     surface.muted = stored(STORE_MUTE) === "1";
     el.btnMute.classList.toggle("is-muted", surface.muted);
+
+    applyWide(stored(STORE_WIDE) === "1");
 
     rollRooms();
     rollNames();

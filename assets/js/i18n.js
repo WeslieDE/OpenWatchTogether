@@ -57,6 +57,8 @@
       "ctl.fwd10":  "10 Sekunden vor",
       "ctl.mute":   "Ton aus",
       "ctl.volume": "Lautstärke",
+      "ctl.wide":     "Video vergrößern",
+      "ctl.narrow":   "Video verkleinern",
       "ctl.full":     "Vollbild (F11)",
       "ctl.exitFull": "Vollbild verlassen (F11)",
 
@@ -177,6 +179,8 @@
       "ctl.fwd10":  "Forward 10 seconds",
       "ctl.mute":   "Mute",
       "ctl.volume": "Volume",
+      "ctl.wide":     "Enlarge video",
+      "ctl.narrow":   "Shrink video",
       "ctl.full":     "Full screen (F11)",
       "ctl.exitFull": "Leave full screen (F11)",
 

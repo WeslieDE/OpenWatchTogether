@@ -166,6 +166,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .is-muted .ico-off { display: block; }
 .ico-unfull, .is-full .ico-full { display: none; }
 .is-full .ico-unfull { display: block; }
+.ico-narrow, .is-wide .ico-wide { display: none; }
+.is-wide .ico-narrow { display: block; }
 
 /* ---------------------------------------------------------------- Overlay -- */
 
@@ -336,6 +338,18 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 /* Die Warteschlange fuellt den Rest der Spalte. */
 .panel-grow { display: flex; flex-direction: column; min-height: 0; }
 .panel-grow .queue { flex: 1; overflow-y: auto; }
+
+/* Grosses Bild: die Spalte rechts raeumt das Feld und legt sich unter das
+   Video. Zuschauer und Warteschlange stehen dort nebeneinander, damit die
+   Seite nicht ins Endlose waechst. */
+.app.is-wide .layout { grid-template-columns: minmax(0, 1fr); }
+.app.is-wide .side {
+  position: static;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-rows: auto;
+  align-items: start;
+}
+.app.is-wide .panel-grow .queue { max-height: 360px; }
 
 /* ---------------------------------------------------------------- Buehne --- */
 
@@ -747,6 +761,9 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
   .side { position: static; grid-template-rows: auto auto; }
   .table-wrap { max-height: none; }
   .panel-grow .queue { overflow-y: visible; }
+  .app.is-wide .panel-grow .queue { max-height: none; }
+  /* Hier steht ohnehin schon alles untereinander. */
+  #btnWide { display: none; }
 }
 
 @media (max-width: 720px) {

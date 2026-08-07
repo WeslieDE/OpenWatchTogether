@@ -34,6 +34,8 @@
   <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 7h9M4 12h9M4 17h6M20 9v8l-4.5-4z" /></symbol>
   <symbol id="i-full" viewBox="0 0 24 24"><path d="M4.5 9V4.5H9M15 4.5h4.5V9M19.5 15v4.5H15M9 19.5H4.5V15"/></symbol>
   <symbol id="i-unfull" viewBox="0 0 24 24"><path d="M9 4.5V9H4.5M19.5 9H15V4.5M15 19.5V15h4.5M4.5 15H9v4.5"/></symbol>
+  <symbol id="i-wide" viewBox="0 0 24 24"><path d="M3.5 6.5v11M20.5 6.5v11M9.5 8.5L6 12l3.5 3.5M14.5 8.5L18 12l-3.5 3.5"/></symbol>
+  <symbol id="i-narrow" viewBox="0 0 24 24"><path d="M3.5 6.5v11M20.5 6.5v11M6.5 8.5L10 12l-3.5 3.5M17.5 8.5L14 12l3.5 3.5"/></symbol>
   <symbol id="i-again" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7M20.5 4v4.5H16"/></symbol>
   <symbol id="i-back10" viewBox="0 0 24 24">
     <path d="M4 12a8 8 0 1 0 2.4-5.7M3.5 4v4.5H8"/>
@@ -285,6 +287,11 @@
           <input class="vol-range" id="volRange" type="range" min="0" max="100" value="50"
                  data-i18n-attr="aria-label:ctl.volume">
         </div>
+
+        <button class="icon-btn" id="btnWide" data-i18n-attr="title:ctl.wide">
+          <svg class="ico-wide"><use href="#i-wide"/></svg>
+          <svg class="ico-narrow"><use href="#i-narrow"/></svg>
+        </button>
 
         <button class="icon-btn" id="btnFull" data-i18n-attr="title:ctl.full">
           <svg class="ico-full"><use href="#i-full"/></svg>
