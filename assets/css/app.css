@@ -497,6 +497,24 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 
 .viewers tr.is-drifting .v-pos { color: var(--warn); }
 
+/* Protokoll. Dieselbe Tabelle wie bei den Zuschauern, drei Spalten, und so
+   breit wie das Video darueber. */
+/* Eigene Hoehe, nicht die der Zuschauer: das Protokoll bleibt auch auf
+   schmalen Geraeten ein Fenster und waechst nicht ins Endlose. */
+.log-wrap { max-height: 236px; overflow-y: auto; }
+.log-col-at  { width: 96px; }
+.log-col-who { width: 30%; }
+.log-at { color: var(--text-2); font-size: 13px; white-space: nowrap; }
+.log-what { color: var(--text); }
+.log-nobody { color: var(--text-3); }
+.log-none td { padding: 24px 14px; text-align: center; color: var(--text-3); }
+
+@media (max-width: 720px) {
+  .log-col-at { width: 74px; }
+  .log .log-at { font-size: 12px; }
+  .log td { padding: 9px 10px; }
+}
+
 /* Warteschlange */
 .q-item {
   display: grid; grid-template-columns: 92px minmax(0, 1fr) auto;

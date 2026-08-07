@@ -85,6 +85,12 @@ The viewer list shows every person in the room and their exact position in the
 video, plus a marker on the timeline. Anyone lagging behind is highlighted, so you
 can see at a glance if someone's connection is struggling.
 
+### 🕘 A log of what just happened
+Under the player, a small table records the moves that matter — started, paused,
+switched, added, removed — with the time and who did it. It lives entirely in your
+browser: nothing is stored on the server, and it starts empty the moment you join,
+so it only ever shows what happened while you were there.
+
 ### 🔊 Your volume is *your* volume
 Everything is synced except the sound. Turn it down, mute it, crank it up — it
 only affects you, and your browser remembers it for next time.

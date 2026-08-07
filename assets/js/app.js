@@ -114,6 +114,8 @@
 
     nowTitle: $("nowTitle"), nowBy: $("nowBy"), btnTakeover: $("btnTakeover"),
 
+    logRows: $("logRows"), logCount: $("logCount"),
+
     viewerRows: $("viewerRows"), viewerCount: $("viewerCount"),
     queue: $("queue"), queueCount: $("queueCount"), queueEmpty: $("queueEmpty"),
 
@@ -309,8 +311,10 @@
       /* Zustand vom Taktgeber, laut Planung alle 2 Sekunden. */
       case "video":
         if (isMaster()) break;                 /* eigener Zustand zaehlt */
+        var ran = S.remote.playing;
         S.remote = { playing: !!d.playing, t: d.t || 0, at: now() };
         S.remoteFresh = true;
+        if (S.remote.playing !== ran) notePlay(S.remote.playing, S.masterId);
         break;
 
       /* Welches Video laeuft. Gibt der Taktgeber vor. */
@@ -340,6 +344,10 @@
       /* Fertig oder abgebrochen. Abgebrochenes verschwindet wieder. Was fertig
          ist, kommt gleich darauf als frische Warteschlange herein. */
       case "upload-end":
+        /* Der Eintrag traegt den Absender schon mit sich. Was durch ist,
+           steht gleich darauf in der frischen Warteschlange. */
+        var fin = pendingById(d.id);
+        if (fin && d.ok) logAdd("log.add", fin.title, logWho(fin.byId, fin.by));
         dropPending(d.id);
         break;
 
@@ -427,6 +435,15 @@
   }
 
   function loadItem(item, opts) {
+    /* Ein Wechsel geht auf das Konto des Taktgebers: entweder hat er gerade
+       umgeschaltet, oder ich selbst habe den Takt dafuer uebernommen. Der
+       erste Aufbau nach dem Beitritt ist kein Wechsel. */
+    var left = S.current;
+    if (left && (!item || left.id !== item.id)) {
+      noteLeft(left.id);
+      if (item) logAdd("log.switch", item.title, logWho(S.masterId));
+    }
+
     S.current = item || null;
     S.correcting = 0;
     el.badgeSync.hidden = true;
@@ -497,6 +514,7 @@
     if (!surface.ready) return;
     takeControl(true);
     surface.play();
+    notePlay(true, S.me.id);
     sendVideo();
     updatePlayUi();
   }
@@ -505,6 +523,7 @@
     if (!surface.ready) return;
     takeControl(true);
     surface.pause();
+    notePlay(false, S.me.id);
     sendVideo();
     updatePlayUi();
   }
@@ -639,6 +658,121 @@
     if (stamp - syncNotedAt < 4000) return;
     syncNotedAt = stamp;
     toast(t("toast.synced"), "i-users");
+  }
+
+  /* ------------------------------------------------------------ Protokoll */
+
+  /* Was im Raum vorgeht, steht untereinander unter dem Video. Der Verlauf
+     liegt allein im Browser: nichts davon geht an den Server, nichts
+     ueberlebt das Neuladen der Seite. Zu sehen ist nur, was seit dem eigenen
+     Beitritt geschehen ist.
+
+     Woher die Angaben kommen: eigene Handgriffe tragen sich selbst ein, alles
+     andere wird aus den Nachrichten der Verbindung gelesen. Starten, Anhalten
+     und Wechseln kommt vom Taktgeber, ein fertiger Upload bringt seinen
+     Absender schon mit. Nur beim Entfernen sagt die Leitung nicht, wer es
+     war - dann bleibt die Spalte leer. */
+
+  var LOG_MAX = 200;
+  var logbook = [];
+
+  /* Wer war es? Der Teilnehmer, wie er jetzt heisst, sonst der mitgereichte
+     Name. Was einmal im Protokoll steht, aendert sich spaeter nicht mehr. */
+  function logWho(id, fallback) {
+    var p = id ? peerById(id) : null;
+    if (p) return { id: p.id, name: p.name, color: p.color };
+    if (id === S.me.id) return { id: id, name: S.me.name, color: S.me.color };
+    if (fallback) return { id: id, name: fallback, color: "#86868f" };
+    return null;
+  }
+
+  function logAdd(key, title, who) {
+    logbook.unshift({ at: new Date(), key: key, title: title || "", who: who || null });
+    if (logbook.length > LOG_MAX) logbook.length = LOG_MAX;
+    renderLog();
+  }
+
+  /* Stunde, Minute, Sekunde. In beiden Sprachen mit 24 Stunden, damit die
+     Spalte schmal bleibt. */
+  function logTime(when) {
+    return when.toLocaleTimeString(i18n.get() === "de" ? "de-DE" : "en-GB",
+      { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  function renderLog() {
+    el.logCount.textContent = String(logbook.length);
+
+    if (!logbook.length) {
+      el.logRows.innerHTML = '<tr class="log-none"><td colspan="3">' +
+        esc(t("log.empty")) + "</td></tr>";
+      return;
+    }
+
+    el.logRows.innerHTML = logbook.map(function (entry) {
+      var who = entry.who
+        ? '<span class="v-who">' +
+            '<span class="avatar" style="background:' + esc(entry.who.color) + '">' +
+              esc(initials(entry.who.name)) + "</span>" +
+            '<span class="v-name">' + esc(entry.who.name) + "</span>" +
+            (entry.who.id === S.me.id
+              ? '<span class="v-you">' + esc(t("viewers.you")) + "</span>" : "") +
+          "</span>"
+        : '<span class="log-nobody">–</span>';
+
+      return "<tr>" +
+        '<td class="log-at mono">' + esc(logTime(entry.at)) + "</td>" +
+        '<td class="log-what">' + esc(t(entry.key, { title: entry.title })) + "</td>" +
+        "<td>" + who + "</td>" +
+      "</tr>";
+    }).join("");
+  }
+
+  /* Start und Pause werden erst nach einer kurzen Ruhe vermerkt. Beim Wechsel
+     auf ein anderes Video zuckt der Zustand einmal hin und zurueck, weil das
+     frisch geladene Video kurz steht. Das gehoert nicht ins Protokoll. */
+  var playShown = false;    /* zuletzt eingetragener Zustand */
+  var playTimer = 0;
+  var playBy = null;
+
+  function notePlay(playing, byId) {
+    playBy = byId;
+    if (playTimer) global.clearTimeout(playTimer);
+    playTimer = global.setTimeout(function () {
+      playTimer = 0;
+      if (playing === playShown) return;
+      playShown = playing;
+      logAdd(playing ? "log.play" : "log.pause", "", logWho(playBy));
+    }, 1600);
+  }
+
+  /* Zuletzt verlassenes Video. Es verschwindet gleich darauf aus der
+     Warteschlange, wenn es durchgelaufen ist. Das ist kein Entfernen. */
+  var leftId = "";
+  var leftAt = 0;
+
+  function noteLeft(id) {
+    leftId = id;
+    leftAt = Date.now();
+  }
+
+  /* Eintraege, die aus der Warteschlange verschwunden sind. Eigenes Entfernen
+     steht zu diesem Zeitpunkt laengst im Protokoll und ist auch schon aus der
+     eigenen Liste raus, taucht hier also nicht mehr auf. */
+  function noteGone(items) {
+    if (!S.joined) return;
+    var still = {};
+    var here = S.current ? S.current.id : "";
+    items.forEach(function (item) { still[item.id] = true; });
+    S.queue.forEach(function (old) {
+      if (still[old.id]) return;
+      /* Das laufende und das eben verlassene Video verschwinden auch dann aus
+         der Liste, wenn sie einfach durchgelaufen sind. Ob jemand nachgeholfen
+         hat, sagt die Leitung nicht. Also lieber kein Eintrag als ein
+         falscher. */
+      if (old.id === here) return;
+      if (old.id === leftId && Date.now() - leftAt < 8000) return;
+      logAdd("log.del", old.title, null);
+    });
   }
 
   /* ------------------------------------------------------------- Rendering */
@@ -782,6 +916,7 @@
 
   /* Frische Warteschlange vom Server. */
   function applyQueue(items) {
+    noteGone(items);
     S.queue = items.slice();
 
     /* Laeuft gerade etwas, das es nicht mehr gibt? Dann weiter zum naechsten. */
@@ -811,6 +946,7 @@
 
     var wasCurrent = S.current && S.current.id === id;
     dropLocal(id);
+    logAdd("log.del", item.title, logWho(S.me.id));
 
     if (wasCurrent) {
       takeControl(true);
@@ -844,6 +980,7 @@
     updatePlayUi();
     renderViewers();
     renderQueue();
+    renderLog();
     if (!el.veilName.hidden) fillNameDialog(el.formName.dataset.mode === "change");
     if (S.jobs.length) { renderJobs(); paintUpload(); }
     /* Die Wortlisten haengen an der Sprache. */
@@ -1118,6 +1255,10 @@
     var first = !S.joined;
     S.joined = true;
     el.app.hidden = false;
+
+    /* Das Protokoll beginnt hier. Was vorher war, geht mich nichts an. */
+    playShown = S.remote.playing;
+    renderLog();
 
     renderViewers();
     renderQueue();
@@ -1460,6 +1601,7 @@
 
     if (item && !itemById(item.id)) S.queue.push(item);
     batchDone.push(item ? item.title : job.title);
+    logAdd("log.add", item ? item.title : job.title, logWho(S.me.id));
     renderQueue();
 
     if (!S.current && item) loadItem(item, { autoplay: false });
