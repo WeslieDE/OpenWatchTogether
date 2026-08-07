@@ -53,6 +53,8 @@
 
       "ctl.play":   "Abspielen",
       "ctl.pause":  "Pause",
+      "ctl.back10": "10 Sekunden zurück",
+      "ctl.fwd10":  "10 Sekunden vor",
       "ctl.mute":   "Ton aus",
       "ctl.volume": "Lautstärke",
       "ctl.full":     "Vollbild (F11)",
@@ -171,6 +173,8 @@
 
       "ctl.play":   "Play",
       "ctl.pause":  "Pause",
+      "ctl.back10": "Back 10 seconds",
+      "ctl.fwd10":  "Forward 10 seconds",
       "ctl.mute":   "Mute",
       "ctl.volume": "Volume",
       "ctl.full":     "Full screen (F11)",

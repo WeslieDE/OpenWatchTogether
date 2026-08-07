@@ -110,6 +110,7 @@
     badgeWait: $("badgeWait"), badgeWaitText: $("badgeWaitText"),
 
     controls: $("controls"), btnPlay: $("btnPlay"), tCur: $("tCur"), tDur: $("tDur"),
+    btnBack10: $("btnBack10"), btnFwd10: $("btnFwd10"),
     scrub: $("scrub"), scrubFill: $("scrubFill"), scrubKnob: $("scrubKnob"),
     scrubPeers: $("scrubPeers"), scrubHint: $("scrubHint"),
     btnMute: $("btnMute"), volRange: $("volRange"), btnFull: $("btnFull"),
@@ -547,6 +548,15 @@
   }
 
   function togglePlay() { surface.paused ? doPlay() : doPause(); }
+
+  /* Ein Stueck vor oder zurueck. Wie jedes Spulen gilt es fuer alle, also
+     uebernimmt der Springende den Takt. */
+  var SKIP = 10;
+
+  function skip(by) {
+    if (!surface.ready) return;
+    doSeek(clamp(surface.position + by, 0, surface.length || 0));
+  }
 
   function doSeek(tt) {
     if (!surface.ready) return;
@@ -1129,6 +1139,8 @@
   /* ------------------------------------------------------------- Bedienung */
 
   el.btnPlay.addEventListener("click", togglePlay);
+  el.btnBack10.addEventListener("click", function () { skip(-SKIP); });
+  el.btnFwd10.addEventListener("click", function () { skip(SKIP); });
   el.btnBigPlay.addEventListener("click", function (e) { e.stopPropagation(); doPlay(); });
   el.btnTakeover.addEventListener("click", function () { takeControl(false); });
 

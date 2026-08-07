@@ -416,6 +416,10 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 }
 .controls[data-idle="1"] { opacity: .5; pointer-events: none; }
 
+/* Zehn Sekunden vor und zurueck. Etwas groesser gezeichnet, sonst
+   verschwindet die Zahl im Ring. */
+.ctl-skip svg { width: 22px; height: 22px; }
+
 .time { font-size: 13px; color: var(--text-2); flex: none; }
 .time-total { color: var(--text-3); }
 
