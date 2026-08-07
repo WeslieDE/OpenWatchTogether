@@ -594,7 +594,11 @@
   }
 
   /* Durchgelaufen: der Taktgeber raeumt das Video weg und geht weiter. Die
-     anderen bekommen die neue Liste und das neue "now" ueber die Verbindung. */
+     anderen bekommen die neue Liste und das neue "now" ueber die Verbindung.
+
+     Soll der Raum seine Videos behalten, wird nichts geloescht. Dann rueckt
+     nur das naechste nach, und die Liste faengt hinten wieder von vorne an.
+     Liegt gar nichts anderes da, bleibt das Video am Ende stehen. */
   function onEnded() {
     var done = S.current;
     if (!done || !isMaster()) return;
@@ -603,8 +607,22 @@
     var next = S.queue[idx + 1] || S.queue[0] || null;
     if (next === done) next = null;
 
-    dropLocal(done.id);
     toast(t("toast.finished", { title: done.title }), "i-check");
+
+    if (S.settings.keep) {
+      if (!next) {
+        surface.pause();
+        notePlay(false, S.me.id);
+        sendVideo();
+        updatePlayUi();
+        return;
+      }
+      loadItem(next);
+      toast(t("toast.next", { title: next.title }), "i-queue");
+      return;
+    }
+
+    dropLocal(done.id);
     loadItem(next);
     if (next) toast(t("toast.next", { title: next.title }), "i-queue");
 
