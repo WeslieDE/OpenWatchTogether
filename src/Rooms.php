@@ -52,6 +52,23 @@ final class Rooms
         return $dir;
     }
 
+    /**
+     * Der Klarname zu einem Raumordner. Nur gueltig, wenn der Ordner auch
+     * wirklich zu diesem Namen gehoert - sonst ist dort etwas anderes gelandet.
+     */
+    public static function slugOf(string $dir): ?string
+    {
+        $file = $dir . '/room.txt';
+        if (!\is_file($file)) {
+            return null;
+        }
+        $slug = self::normalize((string)@\file_get_contents($file));
+        if ($slug === '' || self::id($slug) !== \basename($dir)) {
+            return null;
+        }
+        return $slug;
+    }
+
     /** Haelt fest, dass im Raum etwas los war. */
     public static function touch(string $slug): void
     {

@@ -1,7 +1,8 @@
 <?php
 /**
  * Aufraeumen. Raeume und Videos bleiben liegen, solange der Dienst laeuft.
- * Weg sind sie erst beim Neustart, dort verwirft wipe() den ganzen Bestand.
+ * Weg sind sie erst beim Neustart, dort verwirft wipe() den Bestand - bis auf
+ * die Raeume, die ihre Videos ausdruecklich behalten sollen.
  *
  * Im Betrieb wird nur weggeraeumt, was niemandem gehoert: angefangene
  * Uebertragungen, an denen seit sechs Stunden niemand mehr arbeitet.
@@ -60,11 +61,55 @@ final class Cleanup
         return $stat;
     }
 
-    /** Alles loeschen. Wird beim Start des Containers aufgerufen. */
+    /**
+     * Alles loeschen. Wird beim Start des Containers aufgerufen.
+     *
+     * Ausgenommen sind Raeume, in denen die Videos ausdruecklich liegen
+     * bleiben sollen und in denen auch noch welche liegen. Sie ueberstehen den
+     * Neustart; nur die angefangenen Uebertragungen darin gehen weg, denn zu
+     * denen gehoert kein Browser mehr.
+     */
     public static function wipe(): void
     {
-        Files::removeTree((string)Config::get('mediaDir'));
-        Files::ensureDir((string)Config::get('mediaDir'));
+        $media = (string)Config::get('mediaDir');
+        Files::ensureDir($media);
+
+        foreach (@\scandir($media) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $dir = $media . '/' . $entry;
+            if (!\is_dir($dir)) {
+                @\unlink($dir);
+                continue;
+            }
+            if (self::kept($dir)) {
+                self::wipeParts($dir);
+                continue;
+            }
+            Files::removeTree($dir);
+        }
+    }
+
+    /** Soll dieser Raumordner den Neustart ueberleben? */
+    private static function kept(string $dir): bool
+    {
+        $slug = Rooms::slugOf($dir);
+        if ($slug === null) {
+            return false;
+        }
+        try {
+            return Db::keeps($slug);
+        } catch (\Throwable $e) {
+            /* Ohne lesbare Datenbank gibt es nichts zu bewahren. */
+            return false;
+        }
+    }
+
+    private static function wipeParts(string $dir): void
+    {
+        Files::removeTree($dir . '/parts');
+        Files::ensureDir($dir . '/parts');
     }
 
     private static function sweepParts(string $dir, int $now): int

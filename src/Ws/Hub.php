@@ -16,13 +16,15 @@
  *     queue       Warteschlange, sobald sich etwas daran geaendert hat
  *     now         welches Video gerade laeuft
  *     ready       jemand hat das laufende Video geladen
+ *     settings    Einstellungen des Raumes, sobald jemand sie geaendert hat
  *
  * Wird der letzte Teilnehmer verabschiedet, bleibt die Stelle des laufenden
  * Videos in der Datenbank des Raumes stehen. Wer den Raum wieder aufweckt,
  * bekommt sie im welcome als "resume" mit.
  *
  *   Client an Server
- *     pos, video, take, name, upload, upload-end, changed, now, ready, bye
+ *     pos, video, take, name, upload, upload-end, changed, now, ready,
+ *     settings, bye
  *
  * Lautstaerke und Ton gehen bewusst nicht ueber die Leitung.
  */
@@ -87,8 +89,9 @@ final class Hub
                 $room->uploads
             )),
             'queue'   => $db->queue(),
-            'now'     => $db->meta('now'),
-            'resume'  => \round($resume, 3),
+            'now'      => $db->meta('now'),
+            'resume'   => \round($resume, 3),
+            'settings' => $db->settings(),
         ]);
 
         $this->broadcast($room, 'joined', [
@@ -269,6 +272,17 @@ final class Hub
                     'id'   => $id,
                     'item' => $room->peers[$id]['ready'],
                 ], $id);
+                break;
+
+            /* Einstellungen des Raumes. Sie gelten fuer alle, also darf sie
+               auch jeder setzen - wie das Entfernen eines Videos. Der neue
+               Stand geht an alle zurueck, den Absender eingeschlossen, damit
+               niemand mit einer eigenen Fassung dasteht. */
+            case 'settings':
+                $this->broadcast($room, 'settings', \array_merge(
+                    Db::of($slug)->setSettings($d),
+                    ['byId' => $id, 'by' => $room->peers[$id]['name']]
+                ));
                 break;
 
             case 'bye':
