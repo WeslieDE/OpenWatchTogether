@@ -480,7 +480,8 @@
     /* Genau dieser Wechsel ist es, auf den der Raum gemeinsam wartet. Das
        erste Video nach dem Beitritt und das erste im leeren Raum sind kein
        Wechsel und starten wie bisher von Hand. */
-    if (left && item && left.id !== item.id) beginWait(item.id);
+    var switched = !!(left && item && left.id !== item.id);
+    if (switched) beginWait(item.id);
     else endWait();
 
     S.current = item || null;
@@ -495,6 +496,8 @@
     S.told = false;
     S.target = null;
     resumeTo = 0;                      /* eine alte Stelle gilt nicht mehr */
+    startAt = 0;
+    endedAt = "";
 
     if (!item) {
       surface.unload();
@@ -516,6 +519,12 @@
     }
 
     surface.load(item);
+
+    /* Hinter dem Vorspann anfangen. Das gilt nur beim Wechsel: wer mitten in
+       einen laufenden Raum kommt, soll nicht nach vorn gerissen werden. Der
+       Taktgeber springt, die anderen kommen ueber seinen Stand mit. */
+    if (switched && isMaster()) startAt = openingOf(item);
+
     surface.volume = el.volRange.value / 100;
     surface.muted = el.btnMute.classList.contains("is-muted");
     el.stageEmpty.hidden = true;
@@ -724,6 +733,52 @@
     surface.seek(resumeTo);
     resumeTo = 0;
     updateScrub();
+  }
+
+  /* ------------------------------------------------ Vorspann und Abspann */
+
+  /* Zwei Marken des Raumes. Der Vorspann sagt, wo ein frisch gewechseltes
+     Video anfangen soll; der Abspann, ab wann es als durch gilt. Beides
+     entscheidet allein der Taktgeber - die anderen kommen ueber seinen Stand
+     mit, wie bei jedem Sprung. Ohne Angaben bleibt alles beim Alten. */
+
+  var startAt = 0;      /* Stelle, an der das neue Video anfangen soll */
+  var endedAt = "";     /* fuer welches Video schon Schluss gemeldet wurde */
+
+  /* Ein Vorspann, der laenger ist als das Video selbst, waere kein Vorspann. */
+  function openingOf(item) {
+    var at = S.settings.opening;
+    var len = item.duration || 0;
+    if (at <= 0) return 0;
+    return len > 0 && at >= len - 1 ? 0 : at;
+  }
+
+  function startTick() {
+    if (!startAt) return;
+    /* Eine gemerkte Stelle aus dem wieder erwachten Raum sticht den Vorspann
+       aus: dort wurde ja schon einmal weitergeschaut. */
+    if (resumeTo || !isMaster()) { startAt = 0; return; }
+    if (!surface.settled) return;
+
+    surface.seek(startAt);
+    startAt = 0;
+    sendVideo();
+    updateScrub();
+  }
+
+  /* Am Abspann angekommen: das zaehlt wie durchgelaufen. Im Stehen wird nicht
+     geschaltet, sonst reisst schon ein Blick ans Ende das Video weg. */
+  function endingTick() {
+    if (!isMaster() || !S.current || !surface.settled || surface.paused) return;
+    if (endedAt === S.current.id) return;
+
+    var before = S.settings.ending;
+    var len = surface.length;
+    if (before <= 0 || !len || before >= len) return;
+    if (surface.position < len - before) return;
+
+    endedAt = S.current.id;
+    onEnded();
   }
 
   /* Der Taktgeber meldet den neuen Stand, sobald das frisch geladene Video
@@ -2028,10 +2083,13 @@
   /* Abgleich und Anzeige laufen ruhiger als das Bild. */
   global.setInterval(function () {
     if (el.app.hidden) return;
+    /* Erst an die richtige Stelle, dann losspielen lassen. */
+    startTick();
     tellReady();
     startWhenAllReady();
     updateWait();
     syncTick();
+    endingTick();
     updateViewerPositions();
     renderPeerTicks();
   }, 250);
