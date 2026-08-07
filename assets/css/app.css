@@ -392,6 +392,10 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 
 /* ---------------------------------------------------------------- Buehne --- */
 
+/* Buehne und Bedienleiste sind kein Text. Sonst zieht der Doppelklick, der
+   auf Vollbild schaltet, jedes Mal eine blaue Markierung hinter sich her. */
+.stage, .controls { user-select: none; -webkit-user-select: none; }
+
 .stage {
   position: relative;
   aspect-ratio: 16 / 9;
