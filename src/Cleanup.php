@@ -99,11 +99,16 @@ final class Cleanup
             return false;
         }
         try {
-            return Db::keeps($slug);
+            $keeps = Db::keeps($slug);
         } catch (\Throwable $e) {
             /* Ohne lesbare Datenbank gibt es nichts zu bewahren. */
-            return false;
+            $keeps = false;
         }
+        /* Wer gleich geloescht wird, gibt vorher seine Datei frei. */
+        if (!$keeps) {
+            Db::forget($slug);
+        }
+        return $keeps;
     }
 
     private static function wipeParts(string $dir): void

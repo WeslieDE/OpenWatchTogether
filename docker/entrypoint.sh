@@ -1,6 +1,7 @@
 #!/bin/sh
 # Beim Start wird alles verworfen. Das System ist zustandslos, ein Volume ist
-# nicht vorgesehen.
+# nicht vorgesehen. Stehen bleiben nur Raeume, die ihre Videos ausdruecklich
+# behalten sollen und noch welche haben.
 set -e
 
 DATA="${WT_DATA_DIR:-/data}"

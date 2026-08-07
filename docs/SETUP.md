@@ -65,6 +65,9 @@ Use a different port by changing the left half of `-p`, e.g. `-p 9000:80` for
 > Watch Together is designed to be disposable. Rooms and videos live as long as
 > the container runs; a restart wipes everything clean. That keeps your disk tidy
 > and means you never have to deal with leftovers from last month's movie night.
+> Mount a volume at `/data` only if you want rooms that
+> [keep their videos](#the-exception-a-room-that-keeps-its-videos) to outlive the
+> container as well.
 > Details: [Nothing survives a restart](#nothing-survives-a-restart--and-why-thats-good).
 
 ---
@@ -284,7 +287,9 @@ bytes (e.g. `5368709120` for 5 GB).
 ## Nothing survives a restart — and why that's good
 
 **Watch Together deliberately deletes every uploaded video and every room when
-the service restarts.** This is not a limitation, it is the design:
+the service restarts** — unless a room was told to keep its videos, see
+[the exception](#the-exception-a-room-that-keeps-its-videos) below. This is not a
+limitation, it is the design:
 
 - **Nothing piles up.** A watch party leaves no trace. You never come back
   months later to a disk full of films nobody remembers uploading.
@@ -298,8 +303,8 @@ What that means in practice:
 
 | Event | What happens |
 |---|---|
-| Service / container restarts | **All** rooms, videos, thumbnails and queues are deleted |
-| A video finishes playing | That file is removed from the server automatically |
+| Service / container restarts | All rooms, videos, thumbnails and queues are deleted — except rooms that keep their videos |
+| A video finishes playing | That file is removed from the server automatically, unless the room keeps its videos |
 | Someone removes a video from the queue | The file and its thumbnail are deleted |
 | A room sits empty for a while | Nothing — rooms and their videos stay until the restart |
 | Six hours pass on an abandoned partial upload | The leftover chunks are cleaned up |
@@ -308,10 +313,22 @@ There is **no expiry timer**. As long as the service keeps running, your room
 and its queue stay exactly as you left them — including the position of the video
 you paused, so you can pick it up again the next evening.
 
-> **Want uploads to persist anyway?** Mount a volume at `/data`
-> (`-v watchtogether-data:/data`). The startup wipe still runs, so if you want
-> genuinely permanent storage, also override the entrypoint — but at that point
-> you're using the tool against its grain.
+### The exception: a room that keeps its videos
+
+In the room settings (the slider icon in the top bar) there is a switch called
+**Keep videos**. With it on:
+
+- a video that has run through stays in the queue instead of being deleted;
+- the room survives the startup wipe **as long as videos are actually left in
+  it**. An empty kept room is cleared like any other.
+
+Removing a video by hand still deletes it, and the setting itself lives in the
+room's own database, so it is remembered along with the queue.
+
+> **This only helps across a restart if the data outlives the container.** The
+> startup wipe now spares those rooms, but a container that is recreated from
+> scratch takes its writable layer with it. If you want kept rooms to genuinely
+> stick around, mount a volume at `/data` (`-v watchtogether-data:/data`).
 
 ---
 
@@ -470,7 +487,9 @@ English. Labels in the markup hang off `data-i18n`, strings from code go through
 
 Rooms and videos stay as long as the service runs. There is no timer that makes
 things disappear on their own — a restart clears the lot (the container's
-entrypoint wipes `/data` on startup).
+entrypoint wipes `/data` on startup), except for rooms that
+[keep their videos](#the-exception-a-room-that-keeps-its-videos) and still hold
+some. Those only lose their unfinished uploads.
 
 During operation only orphaned data is removed: partial uploads nobody has
 touched for six hours. That runs in the background of the live process every
@@ -480,7 +499,7 @@ By hand:
 
 ```bash
 php bin/cleanup.php          # leftover partial uploads
-php bin/cleanup.php --wipe   # everything, like a fresh start
+php bin/cleanup.php --wipe   # everything except kept rooms, like a fresh start
 ```
 
 ---

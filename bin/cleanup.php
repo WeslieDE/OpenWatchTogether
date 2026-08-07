@@ -3,7 +3,9 @@
  * Aufraeumen von Hand oder aus einem Zeitplan heraus.
  *
  *   php bin/cleanup.php          liegengebliebene Teildateien loeschen
- *   php bin/cleanup.php --wipe   alles loeschen, wie beim Start des Containers
+ *   php bin/cleanup.php --wipe   alles loeschen, wie beim Start des Containers.
+ *                                Raeume, die ihre Videos behalten sollen und
+ *                                noch welche haben, bleiben stehen.
  */
 declare(strict_types=1);
 
@@ -14,7 +16,8 @@ use tk\weslie\WatchTogether\Config;
 
 if (\in_array('--wipe', $argv, true)) {
     Cleanup::wipe();
-    echo 'Alles geloescht unter ' . Config::get('mediaDir') . \PHP_EOL;
+    echo 'Aufgeraeumt unter ' . Config::get('mediaDir')
+        . ' (Raeume mit behaltenen Videos blieben stehen)' . \PHP_EOL;
     exit(0);
 }
 

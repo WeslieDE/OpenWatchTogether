@@ -66,6 +66,17 @@ straight away, however far along the others are.
 There's no fixed host. Whoever hits play, pause or the timeline takes over
 automatically, and the viewer list shows who's currently setting the pace.
 
+### 🎛️ A player that doesn't stop by accident
+Clicking the picture does **not** pause — one stray click would stop the film for
+everyone. Play and pause live in the control bar and nowhere else, the keyboard
+has no hold on the video at all, and a click on the video just says so.
+
+Double-click or `F11` switches to full screen, where the title and the controls
+lay themselves over the picture and fade away again after five quiet seconds.
+Hovering the timeline names the moment under the pointer, two buttons jump ten
+seconds either way, and one more gives the video the full width by moving the
+viewer list and the queue underneath it.
+
 ### ⏸️ Pause today, continue tomorrow
 Stop halfway through a movie, close the tab, go to bed. When someone opens the
 room again, the video is waiting **at exactly the position you left it** — paused,
@@ -85,6 +96,20 @@ and the name of whoever's adding them. Each entry shows a thumbnail, its runtime
 and who brought it. Anyone can pick what plays next or remove something.
 
 When a video finishes, the next one starts automatically.
+
+### ⚙️ Settings per room
+Two things every room decides for itself, and everyone in it sees the change
+straight away.
+
+**Keep the videos.** Normally a video is deleted the moment it has run through.
+Turn that off and it simply stays in the queue — and as long as videos are left
+in a room, that room survives a restart of the service too.
+
+**Opening and ending.** Give the room a time for the end of the opening and one
+for the start of the ending, and a fresh video starts behind its intro and counts
+as finished as soon as the credits begin. Handy for a series: an evening of
+episodes without the same theme song eight times over. Leave the fields empty and
+nothing changes.
 
 ### 🙋 See where everyone is
 The viewer list shows every person in the room and their exact position in the
@@ -160,7 +185,8 @@ URL from your address bar to whoever should join.
 **Everything is deleted when the service restarts — on purpose.** A watch party
 leaves no trace: no disk slowly filling up, no volume to mount, no backups to
 think about. As long as the service keeps running, your room stays exactly as you
-left it, including the spot you paused at.
+left it, including the spot you paused at. The one exception is a room you
+explicitly told to keep its videos.
 → [Details](docs/SETUP.md#nothing-survives-a-restart--and-why-thats-good)
 
 **Formats:** anything the browser plays directly — MP4, WebM, OGG. Nothing is

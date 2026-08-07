@@ -2,7 +2,8 @@
 # langlaufende Prozess fuer die Live-Verbindung.
 #
 # Zustandslos. Alles Gespeicherte liegt unter /data und wird beim Start
-# verworfen. Ein Volume ist ausdruecklich nicht noetig.
+# verworfen. Ein Volume ist ausdruecklich nicht noetig - erst wenn Raeume ihre
+# Videos ueber den Container hinaus behalten sollen, lohnt eines.
 
 FROM php:8.3-apache
 
