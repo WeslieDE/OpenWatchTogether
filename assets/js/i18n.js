@@ -55,7 +55,7 @@
       "ctl.pause":  "Pause",
       "ctl.mute":   "Ton aus",
       "ctl.volume": "Lautstärke",
-      "ctl.full":   "Vollbild",
+      "ctl.full":   "Vollbild (F11)",
 
       "now.empty":    "Nichts ausgewählt",
       "now.by":       "hinzugefügt von {name}",
@@ -172,7 +172,7 @@
       "ctl.pause":  "Pause",
       "ctl.mute":   "Mute",
       "ctl.volume": "Volume",
-      "ctl.full":   "Full screen",
+      "ctl.full":   "Full screen (F11)",
 
       "now.empty":    "Nothing selected",
       "now.by":       "added by {name}",

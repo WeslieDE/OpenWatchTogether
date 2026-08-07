@@ -1173,6 +1173,16 @@
 
   el.btnFull.addEventListener("click", toggleFullscreen);
 
+  /* F11 gehoert hier dem Video, nicht dem Fenster. Solange ein Dialog offen
+     ist oder gar kein Video anliegt, bleibt die Taste beim Browser. */
+  doc.addEventListener("keydown", function (e) {
+    if (e.key !== "F11" || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (el.app.hidden || veilOpen()) return;
+    if (!doc.fullscreenElement && !surface.ready) return;
+    e.preventDefault();
+    toggleFullscreen();
+  });
+
   el.queue.addEventListener("click", function (e) {
     var stop = e.target.closest("[data-stop]");
     if (stop) { cancelJob(stop.getAttribute("data-stop")); return; }
