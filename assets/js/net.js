@@ -16,9 +16,10 @@
        upload-end  Upload fertig oder abgebrochen
        queue       Warteschlange, sobald sich etwas geaendert hat
        now         welches Video gerade laeuft
+       ready       jemand hat das laufende Video geladen
 
      Client an Server
-       pos, video, take, name, upload, upload-end, changed, now, bye
+       pos, video, take, name, upload, upload-end, changed, now, ready, bye
 
    Lautstaerke und Ton gehen bewusst nicht ueber die Leitung. Jeder regelt
    fuer sich, die Einstellung wird nie gesendet.

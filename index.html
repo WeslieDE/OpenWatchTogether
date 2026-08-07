@@ -195,7 +195,10 @@
 
     <section class="stage-col">
       <div class="stage" id="stage">
-        <video class="stage-video" id="video" playsinline preload="metadata" hidden></video>
+        <!-- preload="auto": der Raum wartet beim Wechsel darauf, dass das
+             Video bei allen im Puffer liegt. Ohne Vorladen kaeme es dort nie
+             an, bevor jemand abspielt. -->
+        <video class="stage-video" id="video" playsinline preload="auto" hidden></video>
 
         <div class="stage-empty" id="stageEmpty">
           <span class="empty-icon"><svg><use href="#i-queue"/></svg></span>
@@ -211,6 +214,11 @@
         <div class="stage-badge" id="badgeSync" hidden>
           <span class="pulse" aria-hidden="true"></span>
           <span data-i18n="stage.sync"></span>
+        </div>
+
+        <div class="stage-badge" id="badgeWait" hidden>
+          <span class="pulse" aria-hidden="true"></span>
+          <span id="badgeWaitText"></span>
         </div>
 
         <div class="stage-badge stage-badge-warn" id="badgeLink" hidden>

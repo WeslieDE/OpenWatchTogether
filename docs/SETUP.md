@@ -15,11 +15,10 @@ command to a manual PHP install behind your own reverse proxy.
 6. [Development on Windows with XAMPP](#development-on-windows-with-xampp)
 7. [Configuration reference](#configuration-reference)
 8. [Nothing survives a restart — and why that's good](#nothing-survives-a-restart--and-why-thats-good)
-9. [Pre-filling new rooms with the `default/` folder](#pre-filling-new-rooms-with-the-default-folder)
-10. [Where your data lives](#where-your-data-lives)
-11. [Technical details](#technical-details)
-12. [Housekeeping](#housekeeping)
-13. [Troubleshooting](#troubleshooting)
+9. [Where your data lives](#where-your-data-lives)
+10. [Technical details](#technical-details)
+11. [Housekeeping](#housekeeping)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -86,7 +85,6 @@ services:
     # Optional — every setting has a sensible default:
     # environment:
     #   WT_MAX_BYTES: "0"        # 0 = no upload size limit
-    #   WT_SEED: "1"             # pre-fill brand-new rooms from ./default
 ```
 
 No `volumes:` entry — that is intentional, see
@@ -270,8 +268,6 @@ Every setting is an environment variable, and every one has a sensible default.
 | `WT_WS_PORT` | `8081` | Port of the live process |
 | `WT_FFMPEG` | `tools/ffmpeg/bin`, else `PATH` | Path to `ffmpeg` |
 | `WT_FFPROBE` | same | Path to `ffprobe` |
-| `WT_SEED` | `1` | Pre-fill brand-new rooms from `default/` — `0` disables it |
-| `WT_DEFAULT_DIR` | `default/` in the project folder | Where those starter videos live |
 
 ### Upload limits
 
@@ -312,42 +308,10 @@ There is **no expiry timer**. As long as the service keeps running, your room
 and its queue stay exactly as you left them — including the position of the video
 you paused, so you can pick it up again the next evening.
 
-Videos placed in the [`default/` folder](#pre-filling-new-rooms-with-the-default-folder)
-are the exception: they are part of the installation, not of a room, and are
-never deleted.
-
 > **Want uploads to persist anyway?** Mount a volume at `/data`
 > (`-v watchtogether-data:/data`). The startup wipe still runs, so if you want
 > genuinely permanent storage, also override the entrypoint — but at that point
 > you're using the tool against its grain.
-
----
-
-## Pre-filling new rooms with the `default/` folder
-
-Want a room that's never empty? Put videos into `default/<roomname>/`. They move
-into the queue automatically the first time somebody enters that room while it is
-still **empty and nobody is in it**:
-
-```
-default/
-  livingroom/
-    01 Trailer.mp4
-    02 Main feature.mp4
-```
-
-- The folder may be named after the **room** (`livingroom`) or its internal room
-  ID — checked in that order.
-- Only browser-playable formats count; anything else in the folder is skipped.
-- Files are ordered by name, which is why numbering them pays off.
-- Runtime and thumbnail are generated just like after an upload.
-- In the queue these show up as *available in the room* rather than added by a
-  person.
-
-Your originals are never touched. The room gets its own directory entry — a hard
-link where possible, so it costs no extra disk space and no time. Removing such a
-video inside a room only removes the room's entry; the original stays and comes
-back with the next empty room. `WT_SEED=0` turns the whole thing off.
 
 ---
 

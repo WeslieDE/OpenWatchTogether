@@ -15,16 +15,14 @@
  *     upload-end  Upload fertig oder abgebrochen
  *     queue       Warteschlange, sobald sich etwas daran geaendert hat
  *     now         welches Video gerade laeuft
+ *     ready       jemand hat das laufende Video geladen
  *
  * Wird der letzte Teilnehmer verabschiedet, bleibt die Stelle des laufenden
  * Videos in der Datenbank des Raumes stehen. Wer den Raum wieder aufweckt,
  * bekommt sie im welcome als "resume" mit.
  *
- * Wer einen Raum aufweckt, in dem nichts liegt, bekommt ausserdem den Vorrat
- * aus default/<Raum>/ in die Warteschlange gelegt. Siehe Seed.
- *
  *   Client an Server
- *     pos, video, take, name, upload, upload-end, changed, now, bye
+ *     pos, video, take, name, upload, upload-end, changed, now, ready, bye
  *
  * Lautstaerke und Ton gehen bewusst nicht ueber die Leitung.
  */
@@ -34,7 +32,6 @@ namespace tk\weslie\WatchTogether\Ws;
 
 use tk\weslie\WatchTogether\Db;
 use tk\weslie\WatchTogether\Rooms;
-use tk\weslie\WatchTogether\Seed;
 
 final class Hub
 {
@@ -66,12 +63,6 @@ final class Hub
         $this->seats[$conn->id] = ['slug' => $slug, 'peer' => $id];
 
         $db = Db::of($slug);
-
-        /* Leerer Raum, leere Warteschlange: was im Vorrat liegt, kommt jetzt
-           hinein und steht gleich im welcome mit drin. */
-        if ($revived) {
-            Seed::into($slug);
-        }
 
         /* Der erste in einem wieder erwachten Raum: das Video steht dort, wo
            es beim Verlassen stand, und wartet angehalten auf ihn. Der Merker
@@ -262,7 +253,22 @@ final class Hub
                 }
                 $itemId = (string)($d['id'] ?? '');
                 Db::of($slug)->setMeta('now', $itemId === '' ? null : $itemId);
+                /* Alle laden neu, also ist niemand mehr bereit. */
+                $room->clearReady();
                 $this->broadcast($room, 'now', ['id' => $itemId === '' ? null : $itemId], $id);
+                break;
+
+            /* Wer das Video im Puffer hat, sagt es. Der Taktgeber laesst es
+               losgehen, sobald alle so weit sind. Die Angabe traegt das Video
+               mit sich, damit eine spaete Meldung nicht faelschlich fuer das
+               naechste gilt. */
+            case 'ready':
+                $item = (string)($d['item'] ?? '');
+                $room->peers[$id]['ready'] = $item === '' ? null : $item;
+                $this->broadcast($room, 'ready', [
+                    'id'   => $id,
+                    'item' => $room->peers[$id]['ready'],
+                ], $id);
                 break;
 
             case 'bye':

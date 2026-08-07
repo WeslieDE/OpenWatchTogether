@@ -67,6 +67,7 @@
     jobs: [],             /* eigene Uploads mit Datei und Fortschritt */
     current: null,
     nowId: null,
+    waiting: null,        /* auf dieses Video warten noch Teilnehmer */
     correcting: 0,
     silentTake: false,
     seq: 100
@@ -106,6 +107,7 @@
     stage: $("stage"), video: $("video"),
     stageEmpty: $("stageEmpty"), stageTap: $("stageTap"), stageStart: $("stageStart"),
     btnBigPlay: $("btnBigPlay"), badgeSync: $("badgeSync"), badgeLink: $("badgeLink"),
+    badgeWait: $("badgeWait"), badgeWaitText: $("badgeWaitText"),
 
     controls: $("controls"), btnPlay: $("btnPlay"), tCur: $("tCur"), tDur: $("tDur"),
     scrub: $("scrub"), scrubFill: $("scrubFill"), scrubKnob: $("scrubKnob"),
@@ -224,7 +226,10 @@
   function toPeer(raw) {
     return {
       id: raw.id, name: raw.name, color: raw.color,
-      isMe: raw.id === S.me.id, t: 0, at: now()
+      isMe: raw.id === S.me.id, t: 0, at: now(),
+      /* Welches Video dieser Teilnehmer geladen hat. Wer eben erst
+         dazugekommen ist, hat noch keines. */
+      ready: raw.ready || null
     };
   }
 
@@ -320,7 +325,7 @@
       /* Welches Video laeuft. Gibt der Taktgeber vor. */
       case "now":
         S.nowId = d.id || null;
-        if (!isMaster()) applyNow(S.nowId, true);
+        if (!isMaster()) applyNow(S.nowId);
         break;
 
       /* Die Warteschlange hat sich geaendert. */
@@ -349,6 +354,13 @@
         var fin = pendingById(d.id);
         if (fin && d.ok) logAdd("log.add", fin.title, logWho(fin.byId, fin.by));
         dropPending(d.id);
+        break;
+
+      /* Jemand hat das Video im Puffer. Ob damit alle so weit sind, sieht der
+         Taktgeber im naechsten Durchlauf. */
+      case "ready":
+        var rp = peerById(d.id);
+        if (rp) rp.ready = d.item || null;
         break;
 
       /* Positionen der anderen Teilnehmer. */
@@ -424,17 +436,17 @@
   /* Welches Video laeuft: was der Taktgeber vorgibt, sonst der Kopf der Liste. */
   var stageReady = false;
 
-  function applyNow(id, autoplay) {
+  function applyNow(id) {
     var item = itemById(id) || S.queue[0] || null;
     if (stageReady) {
       if (S.current && item && S.current.id === item.id) return;
       if (!S.current && !item) return;
     }
     stageReady = true;
-    loadItem(item, { autoplay: !!autoplay && !!item });
+    loadItem(item);
   }
 
-  function loadItem(item, opts) {
+  function loadItem(item) {
     /* Ein Wechsel geht auf das Konto des Taktgebers: entweder hat er gerade
        umgeschaltet, oder ich selbst habe den Takt dafuer uebernommen. Der
        erste Aufbau nach dem Beitritt ist kein Wechsel. */
@@ -443,6 +455,12 @@
       noteLeft(left.id);
       if (item) logAdd("log.switch", item.title, logWho(S.masterId));
     }
+
+    /* Genau dieser Wechsel ist es, auf den der Raum gemeinsam wartet. Das
+       erste Video nach dem Beitritt und das erste im leeren Raum sind kein
+       Wechsel und starten wie bisher von Hand. */
+    if (left && item && left.id !== item.id) beginWait(item.id);
+    else endWait();
 
     S.current = item || null;
     S.correcting = 0;
@@ -486,10 +504,8 @@
     el.nowBy.textContent = byLine(item, "now.by");
     el.tDur.textContent = tc(item.duration || 0);
 
-    /* Das erste Video startet nur von Hand. Laeuft dagegen automatisch das
-       naechste an, weil das vorige zu Ende war, geht es sofort weiter. */
-    if (opts && opts.autoplay) surface.play();
-
+    /* Angespielt wird hier nichts. Entweder wartet der Raum noch auf die
+       anderen, oder jemand drueckt selbst auf Start. */
     sendNow();
     if (isMaster()) sendVideo();
 
@@ -502,17 +518,18 @@
     return item.addedById === S.me.id ? S.me.name : item.addedBy;
   }
 
-  /* Wer hat es mitgebracht? Was aus dem Vorrat des Raumes kommt, hat niemanden
-     dahinter. Dann steht dort, dass es einfach bereitliegt. */
+  /* Wer hat es mitgebracht? Hinter jedem Video steht jemand, der es
+     hochgeladen hat. */
   function byLine(item, key) {
-    return item.addedById === null
-      ? t(key + "Room")
-      : t(key, { name: addedName(item) });
+    return t(key, { name: addedName(item) });
   }
 
+  /* Von Hand gestartet oder angehalten. Beides sticht das Warten auf die
+     anderen aus: wer drueckt, will nicht warten. */
   function doPlay() {
     if (!surface.ready) return;
     takeControl(true);
+    endWait();
     surface.play();
     notePlay(true, S.me.id);
     sendVideo();
@@ -522,6 +539,7 @@
   function doPause() {
     if (!surface.ready) return;
     takeControl(true);
+    endWait();
     surface.pause();
     notePlay(false, S.me.id);
     sendVideo();
@@ -557,7 +575,7 @@
 
     dropLocal(done.id);
     toast(t("toast.finished", { title: done.title }), "i-check");
-    loadItem(next, { autoplay: !!next });
+    loadItem(next);
     if (next) toast(t("toast.next", { title: next.title }), "i-queue");
 
     /* Die Datei wird auf dem Server geloescht, sobald sie durch ist. */
@@ -573,6 +591,77 @@
     updatePlayUi();
     toast(t("toast.blocked"), "i-play");
   };
+
+  /* --------------------------------------------------------- Gemeinsam los */
+
+  /* Ein anderes Video liegt an. Alle laden es erst einmal, und wer so weit
+     ist, sagt Bescheid. Sobald es bei allen im Puffer liegt, laesst der
+     Taktgeber es losgehen - dann faengt niemand mitten im Vorspann an.
+
+     Warten muss niemand: der grosse Knopf startet sofort, egal wie weit die
+     anderen sind. Genauso beendet ein Druck auf Pause das Warten. */
+
+  var toldReady = "";      /* fuer welches Video ich "geladen" gemeldet habe */
+
+  /* Der Wechsel ist durch, das Warten beginnt. Was vorher geladen war, zaehlt
+     nicht mehr; der Server raeumt es beim "now" ebenso weg. */
+  function beginWait(id) {
+    S.waiting = id;
+    toldReady = "";
+    S.peers.forEach(function (p) { p.ready = null; });
+  }
+
+  function endWait() {
+    S.waiting = null;
+    el.badgeWait.hidden = true;
+  }
+
+  /* Liegt es hier im Puffer, erfahren es die anderen. Einmal je Video. */
+  function tellReady() {
+    var id = S.current ? S.current.id : "";
+    if (!id || toldReady === id || !surface.playable) return;
+    if (!send("ready", { item: id })) return;   /* ohne Leitung spaeter erneut */
+    toldReady = id;
+    var me = peerById(S.me.id);
+    if (me) me.ready = id;
+  }
+
+  function readyCount() {
+    var n = 0;
+    S.peers.forEach(function (p) { if (p.ready === S.waiting) n++; });
+    return n;
+  }
+
+  /* Alle so weit? Dann geht es los. Diese Entscheidung faellt allein beim
+     Taktgeber, die anderen kommen ueber seine Meldung mit. */
+  function startWhenAllReady() {
+    if (!S.waiting || !isMaster()) return;
+    if (!S.current || S.current.id !== S.waiting) return;
+    if (readyCount() < S.peers.length) return;
+    endWait();
+    surface.play();
+    notePlay(true, S.me.id);
+    sendVideo();
+    updatePlayUi();
+  }
+
+  function updateWait() {
+    /* Laeuft es schon, oder liegt laengst ein anderes Video an, ist das
+       Warten vorbei. Der Stand des Taktgebers gehoert dabei erst dann hierher,
+       wenn er sich auf das neue Video bezieht - sonst zaehlt noch das
+       "spielt" des vorigen. */
+    var running = isMaster()
+      ? (surface.ready && !surface.paused)
+      : (S.remoteFresh && S.remote.playing);
+
+    if (S.waiting && (running || !S.current || S.current.id !== S.waiting)) {
+      endWait();
+    }
+    if (!S.waiting) return;
+    el.badgeWait.hidden = false;
+    el.badgeWaitText.textContent =
+      t("stage.wait", { n: readyCount(), total: S.peers.length });
+  }
 
   /* ------------------------------------------------------------- Abgleich */
 
@@ -921,12 +1010,12 @@
 
     /* Laeuft gerade etwas, das es nicht mehr gibt? Dann weiter zum naechsten. */
     if (S.current && !itemById(S.current.id)) {
-      loadItem(S.queue[0] || null, { autoplay: false });
+      loadItem(S.queue[0] || null);
       renderViewers();
       return;
     }
     if (!S.current) {
-      applyNow(S.nowId, false);
+      applyNow(S.nowId);
       return;
     }
     /* Der laufende Eintrag kann frische Angaben tragen, etwa das Vorschaubild. */
@@ -950,7 +1039,7 @@
 
     if (wasCurrent) {
       takeControl(true);
-      loadItem(S.queue[0] || null, { autoplay: false });
+      loadItem(S.queue[0] || null);
     }
     toast(t("toast.removed", { title: item.title }), "i-trash");
 
@@ -1062,7 +1151,7 @@
     var id = row.getAttribute("data-id");
     if (S.current && S.current.id === id) return;
     var item = itemById(id);
-    if (item) { takeControl(true); loadItem(item, { autoplay: false }); }
+    if (item) { takeControl(true); loadItem(item); }
   });
 
   doc.addEventListener("keydown", function (e) {
@@ -1250,6 +1339,9 @@
   function enterApp() {
     closeVeil(el.veilLink);
     el.badgeLink.hidden = true;
+    /* Nach einem Neuaufbau habe ich eine neue Kennung im Raum. Was ich vorher
+       gemeldet hatte, gilt dort nicht mehr. */
+    toldReady = "";
     applyMyName();
 
     var first = !S.joined;
@@ -1262,7 +1354,7 @@
 
     renderViewers();
     renderQueue();
-    applyNow(S.nowId, false);
+    applyNow(S.nowId);
     surface.start();
 
     if (first) toast(t("toast.inRoom", { room: S.room }), "i-check");
@@ -1604,7 +1696,7 @@
     logAdd("log.add", item ? item.title : job.title, logWho(S.me.id));
     renderQueue();
 
-    if (!S.current && item) loadItem(item, { autoplay: false });
+    if (!S.current && item) loadItem(item);
     toast(t("toast.added", { title: item ? item.title : job.title }), "i-check");
   }
 
@@ -1698,6 +1790,9 @@
   /* Abgleich und Anzeige laufen ruhiger als das Bild. */
   global.setInterval(function () {
     if (el.app.hidden) return;
+    tellReady();
+    startWhenAllReady();
+    updateWait();
     syncTick();
     updateViewerPositions();
     renderPeerTicks();

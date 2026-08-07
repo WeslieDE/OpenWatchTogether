@@ -56,6 +56,12 @@ down by 20% until they're back in line — no visible jump, no "3, 2, 1, play!"
 countdown. Only when the gap gets really big does it snap to the right spot and
 say so.
 
+### 🎬 Nobody misses the opening
+Switch to another video and the room waits: a badge counts who already has it
+buffered, and playback starts by itself the moment everyone is ready — including
+when one video ends and the next one comes up. Impatient? Hitting play starts it
+straight away, however far along the others are.
+
 ### 👑 Anyone can take the lead
 There's no fixed host. Whoever hits play, pause or the timeline takes over
 automatically, and the viewer list shows who's currently setting the pace.
@@ -156,10 +162,6 @@ leaves no trace: no disk slowly filling up, no volume to mount, no backups to
 think about. As long as the service keeps running, your room stays exactly as you
 left it, including the spot you paused at.
 → [Details](docs/SETUP.md#nothing-survives-a-restart--and-why-thats-good)
-
-**Want a room that's never empty?** Put videos into `default/<roomname>/` and they
-show up in the queue the first time somebody enters that room.
-→ [Details](docs/SETUP.md#pre-filling-new-rooms-with-the-default-folder)
 
 **Formats:** anything the browser plays directly — MP4, WebM, OGG. Nothing is
 transcoded, so playback starts instantly. MKV and AVI are politely refused.

@@ -110,6 +110,11 @@
     settled:  { get: function () {
       return this.item !== null && this.video.readyState >= 1 && isFinite(this.video.duration);
     }},
+    /* Genug im Puffer, um sofort loszuspielen und nicht gleich wieder zu
+       stocken. Darauf wartet der Raum beim Wechsel auf ein anderes Video. */
+    playable: { get: function () {
+      return this.item !== null && this.video.readyState >= 3;
+    }},
     paused:   { get: function () { return this.item === null || this.video.paused; } },
     position: { get: function () { return this.item ? (this.video.currentTime || 0) : 0; } },
     length:   { get: function () {

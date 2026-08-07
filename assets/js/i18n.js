@@ -49,6 +49,7 @@
       "stage.empty.title": "Noch nichts zu sehen",
       "stage.empty.sub":   "Leg ein Video dazu, dann geht es für alle gleichzeitig los.",
       "stage.sync":        "Wird angeglichen",
+      "stage.wait":        "Warte auf alle · {n}/{total} bereit",
       "stage.tap":         "Abspielen oder pausieren",
 
       "ctl.play":   "Abspielen",
@@ -60,7 +61,6 @@
 
       "now.empty":    "Nichts ausgewählt",
       "now.by":       "hinzugefügt von {name}",
-      "now.byRoom":   "liegt im Raum bereit",
       "now.takeover": "Steuerung übernehmen",
 
       "viewers.title":  "Zuschauer",
@@ -72,7 +72,6 @@
       "queue.title":  "Warteschlange",
       "queue.now":    "läuft",
       "queue.by":     "von {name}",
-      "queue.byRoom": "liegt bereit",
       "queue.remove": "Entfernen",
       "queue.empty":  "Die Warteschlange ist leer.",
       "queue.coming": "wird geladen",
@@ -168,6 +167,7 @@
       "stage.empty.title": "Nothing here yet",
       "stage.empty.sub":   "Add a video and it starts for everyone at the same time.",
       "stage.sync":        "Catching up",
+      "stage.wait":        "Waiting for everyone · {n}/{total} ready",
       "stage.tap":         "Play or pause",
 
       "ctl.play":   "Play",
@@ -179,7 +179,6 @@
 
       "now.empty":    "Nothing selected",
       "now.by":       "added by {name}",
-      "now.byRoom":   "waiting in the room",
       "now.takeover": "Take control",
 
       "viewers.title":  "Viewers",
@@ -191,7 +190,6 @@
       "queue.title":  "Up next",
       "queue.now":    "playing",
       "queue.by":     "by {name}",
-      "queue.byRoom": "waiting",
       "queue.remove": "Remove",
       "queue.empty":  "Nothing queued.",
       "queue.coming": "uploading",

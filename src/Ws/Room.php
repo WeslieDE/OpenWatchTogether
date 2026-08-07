@@ -52,6 +52,9 @@ final class Room
             'color' => self::PALETTE[$this->colors++ % \count(self::PALETTE)],
             'conn'  => $conn,
             'pos'   => 0.0,
+            /* Welches Video dieser Teilnehmer geladen hat. Null heisst: noch
+               keines, der Raum wartet also gegebenenfalls auf ihn. */
+            'ready' => null,
         ];
         $this->peers[$id] = $peer;
         $this->order[] = $id;
@@ -108,7 +111,7 @@ final class Room
         return $wish;
     }
 
-    /** @return list<array<string,string>> Teilnehmer, wie der Browser sie kennt. */
+    /** @return list<array<string,?string>> Teilnehmer, wie der Browser sie kennt. */
     public function listing(): array
     {
         $out = [];
@@ -117,9 +120,21 @@ final class Room
                 'id'    => $id,
                 'name'  => $this->peers[$id]['name'],
                 'color' => $this->peers[$id]['color'],
+                'ready' => $this->peers[$id]['ready'],
             ];
         }
         return $out;
+    }
+
+    /**
+     * Ein anderes Video liegt an: was bisher geladen war, zaehlt nicht mehr.
+     * Alle laden neu, also wartet der Raum wieder auf alle.
+     */
+    public function clearReady(): void
+    {
+        foreach (\array_keys($this->peers) as $id) {
+            $this->peers[$id]['ready'] = null;
+        }
     }
 
     /* ------------------------------------------------------------ Video -- */

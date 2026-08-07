@@ -57,11 +57,6 @@ final class Config
             'maxBytes'   => (int)(self::env('WT_MAX_BYTES') ?? 0),
             'chunkBytes' => (int)(self::env('WT_CHUNK_BYTES') ?? 4 * 1024 * 1024),
 
-            /* Vorrat: was unter default/<Raum>/ liegt, wandert beim ersten
-               Betreten in einen noch leeren Raum. */
-            'seed'       => self::flag('WT_SEED', true),
-            'defaultDir' => self::clean(self::env('WT_DEFAULT_DIR') ?? $root . '/default'),
-
             /* Vorschaubild: hoechstens 420p, Standbild bei 20 Prozent Laufzeit. */
             'posterHeight' => 420,
             'posterAt'     => 0.2,
@@ -82,15 +77,6 @@ final class Config
     {
         $v = \getenv($key);
         return ($v === false || $v === '') ? null : $v;
-    }
-
-    /** Ja/Nein aus der Umgebung. Alles ausser den klaren Neins gilt als Ja. */
-    private static function flag(string $key, bool $fallback): bool
-    {
-        $v = self::env($key);
-        return $v === null
-            ? $fallback
-            : !\in_array(\strtolower($v), ['0', 'off', 'no', 'false', 'nein', 'aus'], true);
     }
 
     /** Vorgabe laut Projektregel: ~/.weslie/WatchTogether */
