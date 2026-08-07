@@ -114,7 +114,7 @@
     scrubPeers: $("scrubPeers"), scrubHint: $("scrubHint"),
     btnMute: $("btnMute"), volRange: $("volRange"), btnFull: $("btnFull"),
 
-    nowTitle: $("nowTitle"), nowBy: $("nowBy"), btnTakeover: $("btnTakeover"),
+    now: $("now"), nowTitle: $("nowTitle"), nowBy: $("nowBy"), btnTakeover: $("btnTakeover"),
 
     logRows: $("logRows"), logCount: $("logCount"),
 
@@ -1065,6 +1065,8 @@
       el.nowTitle.textContent = t("now.empty");
     }
     updatePlayUi();
+    el.btnFull.setAttribute("title",
+      t(doc.fullscreenElement === el.stage ? "ctl.exitFull" : "ctl.full"));
     renderViewers();
     renderQueue();
     renderLog();
@@ -1172,6 +1174,62 @@
   }
 
   el.btnFull.addEventListener("click", toggleFullscreen);
+
+  /* Im Vollbild bleibt die Steuerung dieselbe, sie zieht nur um: Titelzeile
+     und Bedienleiste haengen sich an die Buehne und legen sich ueber das
+     Bild. Damit gilt dort alles, was auch darunter gilt - vor allem, dass ein
+     Klick auf das Bild nichts anhaelt.
+
+     Nach fuenf Sekunden ohne Mausbewegung verschwinden beide wieder. Wer
+     gerade an den Reglern steht, behaelt sie. */
+
+  var FULL_IDLE_MS = 5000;
+  var idleTimer = 0;
+  var docked = null;         /* wohin die beiden Knoten zurueckgehoeren */
+
+  function dock() {
+    if (docked) return;
+    docked = { parent: el.now.parentNode, after: el.now.nextSibling };
+    el.stage.appendChild(el.now);
+    el.stage.appendChild(el.controls);
+  }
+
+  function undock() {
+    if (!docked) return;
+    docked.parent.insertBefore(el.now, docked.after);
+    docked.parent.insertBefore(el.controls, el.now);
+    docked = null;
+  }
+
+  /* Der Zeiger hat sich geruehrt: alles wieder her und die Uhr neu stellen. */
+  function wakeControls() {
+    if (!el.stage.classList.contains("is-full")) return;
+    el.stage.classList.remove("is-idle");
+    if (idleTimer) global.clearTimeout(idleTimer);
+    idleTimer = global.setTimeout(function () {
+      idleTimer = 0;
+      var busy = el.controls.matches(":hover") || el.now.matches(":hover") ||
+                 el.controls.contains(doc.activeElement);
+      if (busy) { wakeControls(); return; }
+      el.stage.classList.add("is-idle");
+      hideHint();
+    }, FULL_IDLE_MS);
+  }
+
+  el.stage.addEventListener("pointermove", wakeControls);
+  el.stage.addEventListener("pointerdown", wakeControls);
+
+  doc.addEventListener("fullscreenchange", function () {
+    var on = doc.fullscreenElement === el.stage;
+    el.stage.classList.toggle("is-full", on);
+    el.btnFull.setAttribute("title", t(on ? "ctl.exitFull" : "ctl.full"));
+
+    if (on) { dock(); wakeControls(); return; }
+
+    if (idleTimer) { global.clearTimeout(idleTimer); idleTimer = 0; }
+    el.stage.classList.remove("is-idle");
+    undock();
+  });
 
   /* F11 gehoert hier dem Video, nicht dem Fenster. Solange ein Dialog offen
      ist oder gar kein Video anliegt, bleibt die Taste beim Browser. */

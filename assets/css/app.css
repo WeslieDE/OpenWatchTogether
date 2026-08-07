@@ -164,6 +164,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .is-playing .ico-pause { display: block; }
 .ico-off, .is-muted .ico-on { display: none; }
 .is-muted .ico-off { display: block; }
+.ico-unfull, .is-full .ico-full { display: none; }
+.is-full .ico-unfull { display: block; }
 
 /* ---------------------------------------------------------------- Overlay -- */
 
@@ -457,6 +459,52 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 @media (max-width: 640px) {
   .vol-range { display: none; }
 }
+
+/* ------------------------------------------------------------- Vollbild ---- */
+/* Im Vollbild ziehen Titelzeile und Steuerung auf die Buehne. Es sind
+   dieselben Knoten wie darunter, nur anders gebettet: dunkler Verlauf statt
+   Flaeche, und die Marken der Farben zeigen fuer diesen Grund nach hell.
+   Nach fuenf Sekunden ohne Mausbewegung verschwindet alles samt Zeiger. */
+
+.stage.is-full {
+  aspect-ratio: auto; width: 100%; height: 100%;
+  border: 0; border-radius: 0; box-shadow: none;
+}
+
+.stage.is-full .now,
+.stage.is-full .controls {
+  position: absolute; left: 0; right: 0; z-index: 6;
+  border: 0; border-radius: 0; box-shadow: none;
+  color: #fff;
+  transition: opacity .2s var(--ease), transform .2s var(--ease);
+
+  --bg:          #101013;
+  --text:        #ffffff;
+  --text-2:      #dcdce2;
+  --text-3:      #adadb7;
+  --surface-3:   rgb(255 255 255 / .16);
+  --line:        rgb(255 255 255 / .22);
+  --line-strong: rgb(255 255 255 / .32);
+}
+
+.stage.is-full .now {
+  top: 0; align-items: flex-start;
+  padding: 16px 22px 44px;
+  background: linear-gradient(to bottom, rgb(6 6 8 / .82), transparent);
+}
+.stage.is-full .now-title { font-size: 18px; }
+
+.stage.is-full .controls {
+  bottom: 0;
+  padding: 46px 22px 18px;
+  background: linear-gradient(to top, rgb(6 6 8 / .9), rgb(6 6 8 / .5) 55%, transparent);
+}
+.stage.is-full .scrub-hint { background: #fff; color: #101013; }
+
+.stage.is-full.is-idle,
+.stage.is-full.is-idle .stage-tap { cursor: none; }
+.stage.is-full.is-idle .now     { opacity: 0; transform: translateY(-10px); pointer-events: none; }
+.stage.is-full.is-idle .controls { opacity: 0; transform: translateY(10px); pointer-events: none; }
 
 /* --------------------------------------------------------------- Laeuft ---- */
 
