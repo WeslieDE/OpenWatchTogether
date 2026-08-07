@@ -563,6 +563,12 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .stage.is-full.is-idle .now     { opacity: 0; transform: translateY(-10px); pointer-events: none; }
 .stage.is-full.is-idle .controls { opacity: 0; transform: translateY(10px); pointer-events: none; }
 
+/* Der grosse Knopf gehoert dazu. Bliebe er allein stehen, schwebte er ohne
+   alles mitten im Bild. */
+.stage.is-full .stage-start { transition: opacity .2s var(--ease); }
+.stage.is-full.is-idle .stage-start { opacity: 0; }
+.stage.is-full.is-idle .big-play { pointer-events: none; }
+
 /* --------------------------------------------------------------- Laeuft ---- */
 
 .now { display: flex; align-items: center; gap: 14px; padding: 2px 4px; min-height: 40px; }

@@ -1248,6 +1248,9 @@
     if (tapTimer) return;
     tapTimer = global.setTimeout(function () {
       tapTimer = 0;
+      /* Hat derselbe Druck gerade erst die eingeschlafene Leiste
+         zurueckgeholt, war er auf sie gemuenzt und nicht auf das Bild. */
+      if (now() - wokeAt < 500) return;
       toast(t("toast.noTap"), "i-play");
     }, 260);
   });
@@ -1308,6 +1311,7 @@
   var FULL_IDLE_MS = 5000;
   var idleTimer = 0;
   var docked = null;         /* wohin die beiden Knoten zurueckgehoeren */
+  var wokeAt = 0;            /* wann die Leiste zuletzt zurueckgeholt wurde */
 
   function dock() {
     if (docked) return;
@@ -1323,30 +1327,64 @@
     docked = null;
   }
 
+  /* Wo der Zeiger zuletzt stand. Gefragt wird nicht ":hover", denn beide
+     Knoten ziehen beim Wechsel ins Vollbild um - und ein umgezogener Knoten
+     traegt seinen alten Schwebezustand noch eine Weile mit sich herum. Die
+     eigene Marke sagt es genauer. */
+  var lastX = -1, lastY = -1;
+
+  function pointerOver(node) {
+    if (lastX < 0) return false;
+    var r = node.getBoundingClientRect();
+    return lastX >= r.left && lastX <= r.right && lastY >= r.top && lastY <= r.bottom;
+  }
+
+  /* Ausserhalb des Vollbilds sagt die Stelle des Zeigers nichts, und genau
+     dort faellt die Bewegung an, die der Browser beim Umschalten nachschiebt:
+     sie kommt noch vor der Meldung ueber den Wechsel und steht auf 0,0 -
+     ausgerechnet in der Titelzeile. Sie bliebe sonst fuer immer stehen. */
+  function noteMove(e) {
+    if (!el.stage.classList.contains("is-full")) return;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    wakeControls();
+  }
+
   /* Der Zeiger hat sich geruehrt: alles wieder her und die Uhr neu stellen. */
   function wakeControls() {
     if (!el.stage.classList.contains("is-full")) return;
-    el.stage.classList.remove("is-idle");
+
+    /* Der Druck, der die Leiste zurueckholt, ist kein Griff nach dem Bild. */
+    if (el.stage.classList.contains("is-idle")) {
+      el.stage.classList.remove("is-idle");
+      wokeAt = now();
+    }
     if (idleTimer) global.clearTimeout(idleTimer);
     idleTimer = global.setTimeout(function () {
       idleTimer = 0;
-      var busy = el.controls.matches(":hover") || el.now.matches(":hover") ||
-                 el.controls.contains(doc.activeElement);
-      if (busy) { wakeControls(); return; }
+      /* Wer mit der Maus auf den Reglern steht oder sich mit der Tastatur
+         durch die Knoepfe arbeitet, behaelt sie. Ein Knopf, auf den nur
+         geklickt wurde, zaehlt nicht: sonst bliebe die Leiste nach dem
+         ersten Druck fuer immer stehen. */
+      if (pointerOver(el.controls) || pointerOver(el.now) ||
+          el.controls.querySelector(":focus-visible")) {
+        wakeControls();
+        return;
+      }
       el.stage.classList.add("is-idle");
       hideHint();
     }, FULL_IDLE_MS);
   }
 
-  el.stage.addEventListener("pointermove", wakeControls);
-  el.stage.addEventListener("pointerdown", wakeControls);
+  el.stage.addEventListener("pointermove", noteMove);
+  el.stage.addEventListener("pointerdown", noteMove);
 
   doc.addEventListener("fullscreenchange", function () {
     var on = doc.fullscreenElement === el.stage;
     el.stage.classList.toggle("is-full", on);
     el.btnFull.setAttribute("title", t(on ? "ctl.exitFull" : "ctl.full"));
 
-    if (on) { dock(); wakeControls(); return; }
+    if (on) { lastX = lastY = -1; dock(); wakeControls(); return; }
 
     if (idleTimer) { global.clearTimeout(idleTimer); idleTimer = 0; }
     el.stage.classList.remove("is-idle");
