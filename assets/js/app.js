@@ -2317,10 +2317,11 @@
      eigene Wahl dauerhaft. */
 
   var darkQuery = global.matchMedia ? global.matchMedia("(prefers-color-scheme: dark)") : null;
+  var THEME_CYCLE = ["light", "dim", "dark"];
 
   function currentTheme() {
     var own = stored(STORE_THEME);
-    if (own === "dark" || own === "light") return own;
+    if (own === "dark" || own === "dim" || own === "light") return own;
     return darkQuery && darkQuery.matches ? "dark" : "light";
   }
 
@@ -2335,7 +2336,8 @@
   }
 
   el.btnTheme.addEventListener("click", function () {
-    store(STORE_THEME, currentTheme() === "dark" ? "light" : "dark");
+    var next = THEME_CYCLE[(THEME_CYCLE.indexOf(currentTheme()) + 1) % THEME_CYCLE.length];
+    store(STORE_THEME, next);
     applyTheme();
   });
 

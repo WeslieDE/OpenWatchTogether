@@ -5,7 +5,7 @@
    Token-System: native CSS custom properties, ein Akzent (Ember).
    Radien-Regel: Flaechen 14px, Bedienelemente 10px, Chips/Pills voll rund.
    Hell ist Standard, Dunkel per data-theme="dark" am <html>.
-   ========================================================================= */
+   Dazwischen "dim": gedaempft, aber kein Schwarz. ========================= */
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -90,6 +90,39 @@
   --shadow-3: 0 32px 80px -24px rgb(0 0 0 / .80), 0 4px 16px -8px rgb(0 0 0 / .50);
 }
 
+:root[data-theme="dim"] {
+  color-scheme: dark;
+
+  --bg:            #2b2b30;
+  --bg-grad:       radial-gradient(1200px 600px at 15% -10%, #3a3a41 0%, transparent 60%);
+  --surface:       #34343b;
+  --surface-2:     #3b3b43;
+  --surface-3:     #45454e;
+  --line:          #505059;
+  --line-strong:   #5f5f6a;
+  --text:          #f0f0f1;
+  --text-2:        #c2c2c9;
+  --text-3:        #97979f;
+
+  --accent:        #ff8a5c;
+  --accent-hi:     #ff9f78;
+  --accent-on:     #2a1006;
+  --accent-soft:   #3a2013;
+  --accent-line:   #5a3018;
+
+  --ok:            #3bb87c;
+  --ok-soft:       #1c3428;
+  --warn:          #d1a13c;
+  --bad:           #e8674f;
+  --bad-soft:      #3a1f1a;
+
+  --stage-bg:      #0d0d10;
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .30);
+  --shadow-2: 0 12px 32px -12px rgb(0 0 0 / .45), 0 2px 8px -4px rgb(0 0 0 / .30);
+  --shadow-3: 0 32px 80px -24px rgb(0 0 0 / .60), 0 4px 16px -8px rgb(0 0 0 / .35);
+}
+
 html, body { height: 100%; }
 
 body {
@@ -164,8 +197,10 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .icon-btn-xs svg { width: 15px; height: 15px; }
 
 /* Theme-Toggle und Play/Pause zeigen je nach Zustand nur ein Glyph */
-.ico-dark, :root[data-theme="dark"] .ico-light { display: none; }
-:root[data-theme="dark"] .ico-dark { display: block; }
+.ico-light, .ico-dim, .ico-dark { display: none; }
+:root[data-theme="light"] .ico-light { display: block; }
+:root[data-theme="dim"]   .ico-dim   { display: block; }
+:root[data-theme="dark"]  .ico-dark  { display: block; }
 .ico-pause, .is-playing .ico-play { display: none; }
 .is-playing .ico-pause { display: block; }
 .ico-off, .is-muted .ico-on { display: none; }
