@@ -59,12 +59,16 @@ say so.
 ### 🎬 Nobody misses the opening
 Switch to another video and the room waits: a badge counts who already has it
 buffered, and playback starts by itself the moment everyone is ready — including
-when one video ends and the next one comes up. Impatient? Hitting play starts it
-straight away, however far along the others are.
+when one video ends and the next one comes up. Impatient? Whoever holds the
+controls can hit play and it starts straight away, however far along the others
+are.
 
 ### 👑 Anyone can take the lead
-There's no fixed host. Whoever hits play, pause or the timeline takes over
-automatically, and the viewer list shows who's currently setting the pace.
+There's no fixed host — but at any moment exactly one person holds the controls,
+and the viewer list shows who. Everyone else sees play, pause, the ten-second
+jumps and the timeline greyed out; pressing them says what's missing instead of
+stopping the film for the whole room. One click on **Take control** and they're
+yours.
 
 ### 🎛️ A player that doesn't stop by accident
 Clicking the picture does **not** pause — one stray click would stop the film for

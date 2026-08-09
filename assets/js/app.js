@@ -212,6 +212,19 @@
   }
   function isMaster() { return S.masterId && S.masterId === S.me.id; }
 
+  /* Bedienen darf nur, wer den Takt vorgibt. Start, Pause, jeder Sprung und
+     der Wechsel auf ein anderes Video gehen den ganzen Raum an - wer sie
+     will, holt sich vorher die Steuerung. Frueher nahm ein Druck sie still
+     mit; jetzt sagt er, was fehlt, und laesst das Bild in Ruhe.
+
+     Das ist eine Sache der Oberflaeche: der Server nimmt Zustand und Wechsel
+     ohnehin nur vom Taktgeber an. */
+  function mayControl() { return !!isMaster(); }
+
+  function denyControl() {
+    toast(t("toast.needControl"), "i-crown");
+  }
+
   /* Laeuft das Video gerade? Als Taktgeber zaehlt der eigene Player. */
   function playingNow() {
     return isMaster() ? (surface.ready && !surface.paused) : S.remote.playing;
@@ -558,7 +571,7 @@
      anderen aus: wer drueckt, will nicht warten. */
   function doPlay() {
     if (!surface.ready) return;
-    takeControl(true);
+    if (!mayControl()) { denyControl(); return; }
     endWait();
     surface.play();
     notePlay(true, S.me.id);
@@ -568,7 +581,7 @@
 
   function doPause() {
     if (!surface.ready) return;
-    takeControl(true);
+    if (!mayControl()) { denyControl(); return; }
     endWait();
     surface.pause();
     notePlay(false, S.me.id);
@@ -579,7 +592,7 @@
   function togglePlay() { surface.paused ? doPlay() : doPause(); }
 
   /* Ein Stueck vor oder zurueck. Wie jedes Spulen gilt es fuer alle, also
-     uebernimmt der Springende den Takt. */
+     bleibt es beim Taktgeber. */
   var SKIP = 10;
 
   function skip(by) {
@@ -589,17 +602,29 @@
 
   function doSeek(tt) {
     if (!surface.ready) return;
-    takeControl(true);
+    if (!mayControl()) { denyControl(); return; }
     surface.seek(tt);
     sendVideo();
     updateScrub();
   }
 
+  /* Hat der Browser das Abspielen abgelehnt? Dann fehlt hier nur der erste
+     Griff, und der grosse Knopf ist der einzige Weg dorthin. */
+  var blocked = false;
+
+  /* Der grosse Knopf gehoert dem Taktgeber. Wer nur zusieht, soll ihn gar
+     nicht erst vor sich haben.
+
+     Eine Ausnahme: laesst der Browser nicht von allein abspielen, kommt der
+     Knopf auch beim Zuschauer zurueck. Sonst saesse er vor einem stehenden
+     Bild, ohne dass ihm etwas dazu einfiele. Er holt dann allein seinen
+     eigenen Player nach; im Raum aendert sich davon nichts. */
   function updatePlayUi() {
     var playing = surface.ready && !surface.paused;
+    if (playing) blocked = false;
     el.btnPlay.classList.toggle("is-playing", playing);
     el.btnPlay.setAttribute("title", t(playing ? "ctl.pause" : "ctl.play"));
-    el.stageStart.hidden = !(surface.ready && !playing);
+    el.stageStart.hidden = !(surface.ready && !playing && (mayControl() || blocked));
   }
 
   /* Durchgelaufen: der Taktgeber raeumt das Video weg und geht weiter. Die
@@ -645,6 +670,7 @@
 
   surface.onBlocked = function () {
     /* Ohne vorherige Bedienung darf der Browser das Abspielen ablehnen. */
+    blocked = true;
     updatePlayUi();
     toast(t("toast.blocked"), "i-play");
   };
@@ -1062,6 +1088,18 @@
 
   function renderTakeover() {
     el.btnTakeover.hidden = !(surface.ready && !isMaster());
+    renderLocks();
+  }
+
+  /* Gesperrt heisst: die Knoepfe bleiben stehen, werden aber blass und tun
+     nichts mehr. Ausgeblendet waere schlechter - dann waere nicht zu sehen,
+     dass es sie gibt und woran es liegt. Ein Druck sagt es. */
+  function renderLocks() {
+    var locked = !mayControl();
+    [el.btnPlay, el.btnBack10, el.btnFwd10, el.scrub].forEach(function (node) {
+      node.classList.toggle("is-locked", locked);
+      node.setAttribute("aria-disabled", locked ? "true" : "false");
+    });
   }
 
   function renderQueue() {
@@ -1240,6 +1278,9 @@
 
   el.scrub.addEventListener("pointerdown", function (e) {
     if (!surface.ready) return;
+    /* Wer nicht den Takt vorgibt, faengt gar nicht erst an zu ziehen: sonst
+       haengte an jeder Bewegung ein Hinweis. */
+    if (!mayControl()) { denyControl(); return; }
     dragging = true;
     try { el.scrub.setPointerCapture(e.pointerId); } catch (err) { /* ohne Capture weiter */ }
     showHint(e.clientX);
@@ -1265,7 +1306,19 @@
   el.btnPlay.addEventListener("click", togglePlay);
   el.btnBack10.addEventListener("click", function () { skip(-SKIP); });
   el.btnFwd10.addEventListener("click", function () { skip(SKIP); });
-  el.btnBigPlay.addEventListener("click", function (e) { e.stopPropagation(); doPlay(); });
+  el.btnBigPlay.addEventListener("click", function (e) {
+    e.stopPropagation();
+    /* Beim Zuschauer steht der Knopf nur da, weil der Browser von allein
+       nicht abspielen wollte. Dann holt er genau das nach - der Raum bleibt
+       davon unberuehrt und der Abgleich zieht ihn gleich an die Stelle. */
+    if (!mayControl()) {
+      blocked = false;
+      surface.play();
+      updatePlayUi();
+      return;
+    }
+    doPlay();
+  });
   el.btnTakeover.addEventListener("click", function () { takeControl(false); });
 
   /* Das Bild selbst steuert nichts. Zu leicht rutscht sonst jemand aus, und
@@ -1441,7 +1494,11 @@
     var id = row.getAttribute("data-id");
     if (S.current && S.current.id === id) return;
     var item = itemById(id);
-    if (item) { takeControl(true); loadItem(item); }
+    if (!item) return;
+    /* Der Wechsel gilt fuer den ganzen Raum, also auch nur fuer den, der den
+       Takt vorgibt. */
+    if (!mayControl()) { denyControl(); return; }
+    loadItem(item);
   });
 
   /* ---------------------------------------------------------------- Raum */

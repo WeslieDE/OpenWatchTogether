@@ -474,6 +474,14 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 }
 .controls[data-idle="1"] { opacity: .5; pointer-events: none; }
 
+/* Gesperrt: nur der Taktgeber bedient das Video. Die Knoepfe bleiben stehen
+   und blass - sie nehmen den Druck noch an, sagen dann aber nur, was fehlt. */
+.is-locked { opacity: .38; }
+.icon-btn.is-locked:hover { background: none; color: var(--text-2); }
+.icon-btn.is-locked:active { transform: none; }
+.scrub.is-locked { cursor: default; }
+.scrub.is-locked:hover .scrub-knob { transform: none; }
+
 /* Zehn Sekunden vor und zurueck. Etwas groesser gezeichnet, sonst
    verschwindet die Zahl im Ring. */
 .ctl-skip svg { width: 22px; height: 22px; }
