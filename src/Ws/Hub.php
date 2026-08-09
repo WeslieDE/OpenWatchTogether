@@ -69,7 +69,10 @@ final class Hub
 
         $revived = !isset($this->rooms[$slug]);
         $room    = $this->rooms[$slug] ??= new Room($slug);
-        $id      = \bin2hex(\random_bytes(4));
+        /* Ein Praefix haelt die ID aus reinen Ziffern heraus - sonst macht
+           PHP daraus einen Integer-Array-Key und die string-Signaturen
+           weiter unten reissen (siehe part()/broadcast()). */
+        $id      = 'p' . \bin2hex(\random_bytes(4));
         $peer    = $room->add($id, \mb_substr(\trim($rawName), 0, 24, 'UTF-8'), $conn);
 
         $this->seats[$conn->id] = ['slug' => $slug, 'peer' => $id];
