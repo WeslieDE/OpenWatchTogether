@@ -17,10 +17,11 @@
        queue       Warteschlange, sobald sich etwas geaendert hat
        now         welches Video gerade laeuft
        ready       jemand hat das laufende Video geladen
+       go          jemand hat sein Zeichen im Bereit-Modus umgelegt
        settings    Einstellungen des Raumes, sobald jemand sie geaendert hat
 
      Client an Server
-       pos, video, take, name, upload, upload-end, changed, now, ready,
+       pos, video, take, name, upload, upload-end, changed, now, ready, go,
        ping, settings, bye
 
    Das "ping" traegt nichts bei sich. Es sagt nur, dass es diesen Browser noch

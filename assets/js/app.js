@@ -65,7 +65,7 @@
     targetAt: 0,
     queue: [],
     /* Einstellungen des Raumes. Gelten fuer alle und kommen vom Server. */
-    settings: { keep: false, opening: 0, ending: 0 },
+    settings: { keep: false, go: false, opening: 0, ending: 0 },
     pending: [],          /* laufende Uploads, eigene und fremde */
     jobs: [],             /* eigene Uploads mit Datei und Fortschritt */
     current: null,
@@ -94,7 +94,8 @@
     veilLink: $("veilLink"), linkLead: $("linkLead"),
 
     veilSettings: $("veilSettings"), formSettings: $("formSettings"),
-    setKeep: $("setKeep"), setOpening: $("setOpening"), setEnding: $("setEnding"),
+    setKeep: $("setKeep"), setGo: $("setGo"),
+    setOpening: $("setOpening"), setEnding: $("setEnding"),
     errSettings: $("errSettings"), btnSettings: $("btnSettings"),
     btnSetClose: $("btnSetClose"), btnSetCancel: $("btnSetCancel"),
 
@@ -116,6 +117,7 @@
     stageEmpty: $("stageEmpty"), stageTap: $("stageTap"), stageStart: $("stageStart"),
     btnBigPlay: $("btnBigPlay"), badgeSync: $("badgeSync"), badgeLink: $("badgeLink"),
     badgeWait: $("badgeWait"), badgeWaitText: $("badgeWaitText"),
+    stageGo: $("stageGo"), btnGoBig: $("btnGoBig"), goBigText: $("goBigText"),
 
     controls: $("controls"), btnPlay: $("btnPlay"), tCur: $("tCur"), tDur: $("tDur"),
     btnBack10: $("btnBack10"), btnFwd10: $("btnFwd10"),
@@ -125,6 +127,7 @@
     btnWide: $("btnWide"), btnFull: $("btnFull"),
 
     now: $("now"), nowTitle: $("nowTitle"), nowBy: $("nowBy"), btnTakeover: $("btnTakeover"),
+    btnGo: $("btnGo"), btnGoText: $("btnGoText"),
 
     logRows: $("logRows"), logCount: $("logCount"),
 
@@ -252,7 +255,9 @@
       isMe: raw.id === S.me.id, t: 0, at: now(),
       /* Welches Video dieser Teilnehmer geladen hat. Wer eben erst
          dazugekommen ist, hat noch keines. */
-      ready: raw.ready || null
+      ready: raw.ready || null,
+      /* Sein Zeichen im Bereit-Modus. */
+      go: !!raw.go
     };
   }
 
@@ -361,6 +366,10 @@
          also kommt der neue Stand auch bei dem an, der ihn geschickt hat. */
       case "settings":
         S.settings = cleanSettings(d);
+        /* Der Bereit-Modus kann eben erst dazugekommen oder weggefallen sein:
+           die Marken in der Liste und die Knoepfe richten sich danach. */
+        renderViewers();
+        renderGoUi();
         logAdd("log.settings", "", logWho(d.byId, d.by));
         toast(d.byId === S.me.id
           ? t("toast.settingsSaved")
@@ -395,6 +404,20 @@
       case "ready":
         var rp = peerById(d.id);
         if (rp) rp.ready = d.item || null;
+        break;
+
+      /* Jemand hat sein Zeichen im Bereit-Modus umgelegt. Ob der Raum damit
+         losgehen kann, sieht der Taktgeber im naechsten Durchlauf. */
+      case "go":
+        var gp = peerById(d.id);
+        if (gp && gp.go !== !!d.on) {
+          gp.go = !!d.on;
+          renderViewers();
+          if (goMode()) {
+            toast(t(gp.go ? "toast.peerGo" : "toast.peerNoGo", { name: gp.name }),
+              gp.go ? "i-check" : "i-close");
+          }
+        }
         break;
 
       /* Positionen der anderen Teilnehmer. */
@@ -492,9 +515,17 @@
 
     /* Genau dieser Wechsel ist es, auf den der Raum gemeinsam wartet. Das
        erste Video nach dem Beitritt und das erste im leeren Raum sind kein
-       Wechsel und starten wie bisher von Hand. */
+       Wechsel und starten wie bisher von Hand.
+
+       Im Bereit-Modus zaehlt dazu aber auch das Video, das beim Beitritt schon
+       im Raum liegt und noch ganz am Anfang steht: davor hat die Runde es noch
+       vor sich, und dann soll sie es auch gemeinsam anfangen. Steht es
+       mittendrin, wurde dort schon geschaut - da wird nicht mehr gewartet. */
     var switched = !!(left && item && left.id !== item.id);
+    var waitsToo = !left && !!item && goMode() && atStart();
+
     if (switched) beginWait(item.id);
+    else if (waitsToo) joinWait(item.id);
     else endWait();
 
     S.current = item || null;
@@ -613,7 +644,8 @@
   var blocked = false;
 
   /* Der grosse Knopf gehoert dem Taktgeber. Wer nur zusieht, soll ihn gar
-     nicht erst vor sich haben.
+     nicht erst vor sich haben - und waehrend der Raum auf die Runde wartet,
+     steht an seiner Stelle der Bereit-Knopf.
 
      Eine Ausnahme: laesst der Browser nicht von allein abspielen, kommt der
      Knopf auch beim Zuschauer zurueck. Sonst saesse er vor einem stehenden
@@ -624,7 +656,8 @@
     if (playing) blocked = false;
     el.btnPlay.classList.toggle("is-playing", playing);
     el.btnPlay.setAttribute("title", t(playing ? "ctl.pause" : "ctl.play"));
-    el.stageStart.hidden = !(surface.ready && !playing && (mayControl() || blocked));
+    el.stageStart.hidden =
+      !(surface.ready && !playing && (mayControl() || blocked) && !goWaiting());
   }
 
   /* Durchgelaufen: der Taktgeber raeumt das Video weg und geht weiter. Die
@@ -694,6 +727,20 @@
     S.peers.forEach(function (p) { p.ready = null; });
   }
 
+  /* Beim Beitritt wird dagegen nichts weggeraeumt: wer das Video schon im
+     Puffer hat, steht so bereits im welcome. Wuerde das hier geloescht,
+     zaehlte die Anzeige von vorn, ohne dass jemand es noch einmal meldet. */
+  function joinWait(id) {
+    S.waiting = id;
+  }
+
+  /* Steht das Video noch ganz am Anfang und ruht? Der Stand kommt vom
+     Taktgeber - bei dem, der den Raum aufweckt, ist es die gemerkte Stelle
+     aus der Datenbank. */
+  function atStart() {
+    return !S.remote.playing && S.remote.t < 1;
+  }
+
   function endWait() {
     S.waiting = null;
     el.badgeWait.hidden = true;
@@ -709,9 +756,16 @@
     if (me) me.ready = id;
   }
 
+  /* Wer kann wirklich losgehen: das Video liegt im Puffer, und im
+     Bereit-Modus hat er auch sein Zeichen gegeben. */
   function readyCount() {
+    var withGo = goMode();
     var n = 0;
-    S.peers.forEach(function (p) { if (p.ready === S.waiting) n++; });
+    S.peers.forEach(function (p) {
+      if (p.ready !== S.waiting) return;
+      if (withGo && !p.go) return;
+      n++;
+    });
     return n;
   }
 
@@ -745,6 +799,80 @@
     el.badgeWaitText.textContent =
       t("stage.wait", { n: readyCount(), total: S.peers.length });
   }
+
+  /* ---------------------------------------------------------- Bereit-Modus */
+
+  /* Wie in einem Spiel: liegt ein Video an, das die Runde noch vor sich hat,
+     geht es erst los, wenn alle "Bereit" gesagt haben. Das ist der Wechsel auf
+     ein anderes Video - und der Beitritt in einen Raum, in dem eines noch ganz
+     am Anfang steht. Waehrend der Wiedergabe hat das Zeichen keine Wirkung,
+     und wer es dann zurueckzieht, haelt erst das naechste Video auf.
+
+     Der Modus liegt in den Raumeinstellungen und ist ab Werk aus. Ist er aus,
+     bleibt alles beim Alten und die Knoepfe dazu sind gar nicht erst da.
+
+     Entschieden wird das hier, nicht auf dem Server: der zaehlt die Zeichen
+     nur weiter, und losgehen laesst der Taktgeber. */
+
+  var wantGo = false;   /* mein eigenes Zeichen. Es ueberlebt einen Neuaufbau */
+
+  function goMode() { return !!S.settings.go; }
+
+  function myGo() {
+    var me = peerById(S.me.id);
+    return me ? !!me.go : wantGo;
+  }
+
+  /* Liegt das Muster gerade ueber dem Bild? Genau dann, wenn der Raum auf die
+     Runde wartet. Mit dem ersten Bild ist es weg. */
+  function goWaiting() {
+    return goMode() && !!S.waiting && !!S.current;
+  }
+
+  function setGo(on) {
+    on = !!on;
+    if (on === myGo()) return;
+
+    wantGo = on;
+    var me = peerById(S.me.id);
+    if (me) me.go = on;
+    send("go", { on: on });
+
+    renderViewers();
+    renderGoUi();
+    toast(t(on ? "toast.youGo" : "toast.youNoGo"), on ? "i-check" : "i-close");
+  }
+
+  /* Nach einem Neuaufbau bin ich fuer den Raum ein Neuer. Mein Zeichen geht
+     deshalb noch einmal raus, sonst wartet die Runde auf ein Ja, das sie
+     laengst hatte. */
+  function tellGo() {
+    if (!wantGo) return;
+    var me = peerById(S.me.id);
+    if (me) me.go = true;
+    send("go", { on: true });
+  }
+
+  function renderGoUi() {
+    var on = goMode();
+    var mine = myGo();
+
+    el.btnGo.hidden = !on;
+    el.btnGo.classList.toggle("is-go", mine);
+    el.btnGoText.textContent = t(mine ? "now.go.on" : "now.go.off");
+
+    var overlay = goWaiting();
+    el.stageGo.hidden = !overlay;
+    el.stageGo.classList.toggle("is-go", mine);
+    el.btnGoBig.setAttribute("aria-pressed", mine ? "true" : "false");
+    el.goBigText.textContent = t(mine ? "stage.go.on" : "stage.go.off");
+  }
+
+  el.btnGo.addEventListener("click", function () { setGo(!myGo()); });
+  el.btnGoBig.addEventListener("click", function (e) {
+    e.stopPropagation();
+    setGo(!myGo());
+  });
 
   /* ------------------------------------------------------------- Abgleich */
 
@@ -1058,8 +1186,12 @@
 
   function renderViewers() {
     var rows = "";
+    var withGo = goMode();
     S.peers.forEach(function (p) {
       var cls = p.id === S.masterId ? "is-master" : "";
+      /* Im Bereit-Modus traegt jede Zeile ihre Farbe: gruen heisst bereit,
+         rot heisst, der Raum wartet beim naechsten Wechsel auf sie. */
+      if (withGo) cls += (cls ? " " : "") + (p.go ? "is-go" : "is-nogo");
       rows += '<tr class="' + cls + '">' +
         '<td><span class="v-who">' +
           '<span class="avatar" style="background:' + p.color + '">' + esc(initials(p.name)) + "</span>" +
@@ -1089,6 +1221,7 @@
   function renderTakeover() {
     el.btnTakeover.hidden = !(surface.ready && !isMaster());
     renderLocks();
+    renderGoUi();
   }
 
   /* Gesperrt heisst: die Knoepfe bleiben stehen, werden aber blass und tun
@@ -1242,6 +1375,7 @@
     renderViewers();
     renderQueue();
     renderLog();
+    renderGoUi();
     if (!el.veilName.hidden) fillNameDialog(el.formName.dataset.mode === "change");
     if (S.jobs.length) { renderJobs(); paintUpload(); }
     /* Die Wortlisten haengen an der Sprache. */
@@ -1678,6 +1812,7 @@
     var v = raw || {};
     return {
       keep:    !!v.keep,
+      go:      !!v.go,
       opening: clamp(Number(v.opening) || 0, 0, 3600),
       ending:  clamp(Number(v.ending) || 0, 0, 3600)
     };
@@ -1709,6 +1844,7 @@
 
   function openSettings() {
     el.setKeep.checked  = S.settings.keep;
+    el.setGo.checked    = S.settings.go;
     el.setOpening.value = spanText(S.settings.opening);
     el.setEnding.value  = spanText(S.settings.ending);
     el.errSettings.hidden = true;
@@ -1737,7 +1873,12 @@
     }
     el.errSettings.hidden = true;
 
-    var next = { keep: el.setKeep.checked, opening: opening, ending: ending };
+    var next = {
+      keep: el.setKeep.checked,
+      go: el.setGo.checked,
+      opening: opening,
+      ending: ending
+    };
     if (!send("settings", next)) { toast(t("toast.failed")); return; }
 
     /* Der Server bestaetigt gleich darauf mit dem endgueltigen Stand, samt
@@ -1760,6 +1901,7 @@
     /* Nach einem Neuaufbau habe ich eine neue Kennung im Raum. Was ich vorher
        gemeldet hatte, gilt dort nicht mehr. */
     toldReady = "";
+    tellGo();
     applyMyName();
 
     var first = !S.joined;
@@ -2213,6 +2355,7 @@
     tellReady();
     startWhenAllReady();
     updateWait();
+    renderGoUi();
     syncTick();
     endingTick();
     updateViewerPositions();

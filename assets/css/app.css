@@ -34,7 +34,10 @@
   --accent-line:   #f3cdbe;
 
   --ok:            #1c7a52;
+  --ok-soft:       #e6f3ec;
   --warn:          #9a6212;
+  --bad:           #b3261e;
+  --bad-soft:      #fdeceb;
 
   --stage-bg:      #101013;
 
@@ -75,7 +78,10 @@
   --accent-line:   #4a2412;
 
   --ok:            #4cc38a;
+  --ok-soft:       #10261c;
   --warn:          #e0a33a;
+  --bad:           #f2705f;
+  --bad-soft:      #2b1210;
 
   --stage-bg:      #08080a;
 
@@ -445,6 +451,64 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .big-play:hover { transform: scale(1.05); background: #fff; }
 .big-play:active { transform: scale(.97); }
 
+/* Bereit-Modus. Solange der Raum auf die Runde wartet, liegt ein Muster ueber
+   dem Bild und in seiner Mitte der Knopf dafuer. Rot heisst: noch nicht
+   bereit. Wie beim grossen Startknopf bleibt der Schleier durchlaessig -
+   daneben zaehlt ein Klick als Klick auf das Bild. */
+.stage-go {
+  position: absolute; inset: 0; z-index: 4;
+  display: grid; place-items: center;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(-45deg,
+      rgb(179 38 30 / .34) 0 10px, transparent 10px 20px),
+    rgb(8 8 10 / .45);
+}
+.stage-go[hidden] { display: none; }
+.stage-go.is-go {
+  background:
+    repeating-linear-gradient(-45deg,
+      rgb(28 122 82 / .34) 0 10px, transparent 10px 20px),
+    rgb(8 8 10 / .45);
+}
+
+.big-go {
+  pointer-events: auto;
+  display: inline-flex; align-items: center; gap: 10px;
+  height: 54px; padding: 0 26px; border: 0; border-radius: var(--r-pill);
+  cursor: pointer; white-space: nowrap;
+  font-size: 16px; font-weight: 650; letter-spacing: -.015em;
+  color: #fff; background: #b3261e;
+  box-shadow: 0 12px 40px -8px rgb(0 0 0 / .5);
+  transition: transform .18s var(--ease), background-color .18s var(--ease);
+}
+.big-go svg { width: 22px; height: 22px; }
+.big-go:hover { transform: scale(1.04); }
+.big-go:active { transform: scale(.97); }
+.stage-go.is-go .big-go { background: #1c7a52; }
+
+/* Solange das Zeichen fehlt, blinkt der Knopf und schiebt einen Ring vor sich
+   her: er wartet ja auf einen Druck. Steht das Zeichen, wird er still. Wer
+   mit dem Zeiger darauf steht, hat ihn ohnehin gefunden - dann hoert es auf. */
+@media (prefers-reduced-motion: no-preference) {
+  .stage-go:not(.is-go) .big-go { animation: go-blink 1.2s var(--ease) infinite; }
+  .stage-go:not(.is-go) .big-go:hover { animation: none; }
+}
+@keyframes go-blink {
+  50% {
+    background: #e6493b;
+    box-shadow: 0 12px 40px -8px rgb(0 0 0 / .5), 0 0 0 13px rgb(230 73 59 / 0);
+  }
+  0%, 100% {
+    background: #b3261e;
+    box-shadow: 0 12px 40px -8px rgb(0 0 0 / .5), 0 0 0 0 rgb(230 73 59 / .5);
+  }
+}
+
+.stage.is-full .stage-go { transition: opacity .2s var(--ease); }
+.stage.is-full.is-idle .stage-go { opacity: 0; }
+.stage.is-full.is-idle .big-go { pointer-events: none; }
+
 .stage-badge {
   position: absolute; top: 12px; left: 12px; z-index: 5;
   display: inline-flex; align-items: center; gap: 8px;
@@ -555,6 +619,11 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
   --surface-3:   rgb(255 255 255 / .16);
   --line:        rgb(255 255 255 / .22);
   --line-strong: rgb(255 255 255 / .32);
+  /* Auf dem dunklen Verlauf braucht der Bereit-Knopf hellere Farben. */
+  --ok:          #4cc38a;
+  --ok-soft:     rgb(76 195 138 / .22);
+  --bad:         #ff7a6b;
+  --bad-soft:    rgb(255 122 107 / .22);
 }
 
 .stage.is-full .now {
@@ -589,8 +658,16 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .now-title { font-size: 16.5px; font-weight: 600; letter-spacing: -.018em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .now-by { font-size: 13px; color: var(--text-3); }
-.now .btn { margin-left: auto; flex: none; }
+.now-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.now-actions .btn { flex: none; }
 .now .btn[hidden] { display: none; }
+
+/* Der Knopf fuer das eigene Zeichen. Er traegt seinen Zustand als Farbe:
+   rot heisst nicht bereit, gruen heisst bereit. */
+.btn-go { background: transparent; border-color: var(--bad); color: var(--bad); }
+.btn-go:hover { background: var(--bad-soft); }
+.btn-go.is-go { border-color: var(--ok); color: var(--ok); }
+.btn-go.is-go:hover { background: var(--ok-soft); }
 
 /* --------------------------------------------------------------- Panels ---- */
 
@@ -636,6 +713,12 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .v-crown svg { width: 15px; height: 15px; }
 
 .viewers tr.is-drifting .v-pos { color: var(--warn); }
+
+/* Bereit-Modus: gruen heisst bereit, rot heisst, der Raum wartet beim
+   naechsten Wechsel auf ihn. Steht hier unten, damit es die Marke des
+   Taktgebers ueberdeckt - die bleibt an Krone und Namen zu erkennen. */
+.viewers tr.is-go   { background: var(--ok-soft); }
+.viewers tr.is-nogo { background: var(--bad-soft); }
 
 /* Protokoll. Dieselbe Tabelle wie bei den Zuschauern, drei Spalten, und so
    breit wie das Video darueber. */

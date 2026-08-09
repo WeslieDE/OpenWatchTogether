@@ -16,6 +16,7 @@
  *     queue       Warteschlange, sobald sich etwas daran geaendert hat
  *     now         welches Video gerade laeuft
  *     ready       jemand hat das laufende Video geladen
+ *     go          jemand hat sein Zeichen im Bereit-Modus umgelegt
  *     settings    Einstellungen des Raumes, sobald jemand sie geaendert hat
  *
  * Wird der letzte Teilnehmer verabschiedet, bleibt die Stelle des laufenden
@@ -23,7 +24,7 @@
  * bekommt sie im welcome als "resume" mit.
  *
  *   Client an Server
- *     pos, video, take, name, upload, upload-end, changed, now, ready,
+ *     pos, video, take, name, upload, upload-end, changed, now, ready, go,
  *     ping, settings, bye
  *
  * Jede Nachricht gilt zugleich als Lebenszeichen. Wer sich zehn Sekunden gar
@@ -293,6 +294,17 @@ final class Hub
                 $this->broadcast($room, 'ready', [
                     'id'   => $id,
                     'item' => $room->peers[$id]['ready'],
+                ], $id);
+                break;
+
+            /* Das Zeichen im Bereit-Modus. Der Server haelt es nur fest und
+               reicht es weiter, damit es auch der sieht, der spaeter kommt.
+               Was daraus folgt, entscheidet der Taktgeber im Browser. */
+            case 'go':
+                $room->peers[$id]['go'] = !empty($d['on']);
+                $this->broadcast($room, 'go', [
+                    'id' => $id,
+                    'on' => $room->peers[$id]['go'],
                 ], $id);
                 break;
 

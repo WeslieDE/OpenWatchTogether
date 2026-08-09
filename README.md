@@ -70,6 +70,21 @@ jumps and the timeline greyed out; pressing them says what's missing instead of
 stopping the film for the whole room. One click on **Take control** and they're
 yours.
 
+### ✅ Ready when everyone is (optional)
+Switch the ready check on and a video change works like a lobby in a game: a
+striped overlay lies over the picture with one big button in the middle, red
+until you're ready and green once you are, and the viewer list colours everyone
+the same way. Playback starts by itself the moment the last person is ready.
+
+The same goes for walking into a room that still has a video sitting at the very
+start — that one hasn't been watched yet either, so it waits for the room. Come
+back to a film you left halfway through and it simply picks up where it was, no
+waiting.
+
+Otherwise the check stays out of the way: pausing and resuming during a video is
+unaffected, and dropping your mark mid-film doesn't stop anything, it just holds
+up the next one. Off by default; when it's off, nothing about it is visible.
+
 ### 🎛️ A player that doesn't stop by accident
 Clicking the picture does **not** pause — one stray click would stop the film for
 everyone. Play and pause live in the control bar and nowhere else, the keyboard
@@ -102,12 +117,15 @@ and who brought it. Anyone can pick what plays next or remove something.
 When a video finishes, the next one starts automatically.
 
 ### ⚙️ Settings per room
-Two things every room decides for itself, and everyone in it sees the change
+Three things every room decides for itself, and everyone in it sees the change
 straight away.
 
 **Keep the videos.** Normally a video is deleted the moment it has run through.
 Turn that off and it simply stays in the queue — and as long as videos are left
 in a room, that room survives a restart of the service too.
+
+**Ready check.** Off by default. Turn it on and a video change waits for the
+whole room, as described above.
 
 **Opening and ending.** Give the room a time for the end of the opening and one
 for the start of the ending, and a fresh video starts behind its intro and counts

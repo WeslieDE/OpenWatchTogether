@@ -55,6 +55,9 @@ final class Room
             /* Welches Video dieser Teilnehmer geladen hat. Null heisst: noch
                keines, der Raum wartet also gegebenenfalls auf ihn. */
             'ready' => null,
+            /* Sein Zeichen im Bereit-Modus. Der Server merkt es sich nur und
+               reicht es weiter; entschieden wird damit im Browser. */
+            'go'    => false,
             /* Wann zuletzt etwas von ihm kam. Bleibt es lange aus, ist die
                Leitung tot und der Platz wird geraeumt. */
             'seen'  => \microtime(true),
@@ -114,7 +117,7 @@ final class Room
         return $wish;
     }
 
-    /** @return list<array<string,?string>> Teilnehmer, wie der Browser sie kennt. */
+    /** @return list<array<string,mixed>> Teilnehmer, wie der Browser sie kennt. */
     public function listing(): array
     {
         $out = [];
@@ -124,6 +127,7 @@ final class Room
                 'name'  => $this->peers[$id]['name'],
                 'color' => $this->peers[$id]['color'],
                 'ready' => $this->peers[$id]['ready'],
+                'go'    => $this->peers[$id]['go'],
             ];
         }
         return $out;

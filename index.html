@@ -197,6 +197,16 @@
         <input class="switch" id="setKeep" type="checkbox" role="switch">
       </label>
 
+      <!-- Bereit-Modus. Aus heisst: beim Wechsel geht es los, sobald das Video
+           bei allen im Puffer liegt. -->
+      <label class="switch-row">
+        <span class="switch-main">
+          <span class="switch-label" data-i18n="set.go.label"></span>
+          <span class="switch-hint" data-i18n="set.go.hint"></span>
+        </span>
+        <input class="switch" id="setGo" type="checkbox" role="switch">
+      </label>
+
       <!-- Vorspann und Abspann. Leer heisst: ganz von vorn bis ganz zum Schluss. -->
       <div class="group">
         <div class="group-head">
@@ -304,6 +314,16 @@
             <svg><use href="#i-play"/></svg>
           </button>
         </div>
+
+        <!-- Bereit-Modus. Solange der Raum auf die Runde wartet, liegt ein
+             Muster ueber dem Bild: rot, bis man selbst bereit ist, dann gruen.
+             Daneben bleibt das Bild anklickbar wie sonst auch. -->
+        <div class="stage-go" id="stageGo" hidden>
+          <button class="big-go" id="btnGoBig" type="button" aria-pressed="false">
+            <svg><use href="#i-check"/></svg>
+            <span id="goBigText"></span>
+          </button>
+        </div>
       </div>
 
       <div class="controls" id="controls">
@@ -362,9 +382,14 @@
           <h2 class="now-title" id="nowTitle"></h2>
           <p class="now-by" id="nowBy"></p>
         </div>
-        <button class="btn btn-soft btn-sm" id="btnTakeover" hidden>
-          <svg><use href="#i-crown"/></svg><span data-i18n="now.takeover"></span>
-        </button>
+        <div class="now-actions">
+          <button class="btn btn-sm btn-go" id="btnGo" type="button" hidden>
+            <svg><use href="#i-check"/></svg><span id="btnGoText"></span>
+          </button>
+          <button class="btn btn-soft btn-sm" id="btnTakeover" hidden>
+            <svg><use href="#i-crown"/></svg><span data-i18n="now.takeover"></span>
+          </button>
+        </div>
       </div>
 
       <!-- Protokoll. Liegt allein im Browser und beginnt beim eigenen Beitritt. -->

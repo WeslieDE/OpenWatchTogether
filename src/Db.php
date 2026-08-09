@@ -79,16 +79,18 @@ final class Db
        den Neustart des Dienstes und gelten fuer alle im Raum gleich.
 
          keep      Videos bleiben liegen, statt nach dem Abspielen wegzugehen
+         go        Bereit-Modus: beim Wechsel wartet der Raum auf die Runde
          opening   Ende des Vorspanns, gemessen vom Anfang der Datei
          ending    Anfang des Abspanns, gemessen vom Ende der Datei
 
        Null heisst jeweils: bleibt beim gewohnten Verhalten. */
 
-    /** @return array{keep:bool,opening:float,ending:float} */
+    /** @return array{keep:bool,go:bool,opening:float,ending:float} */
     public function settings(): array
     {
         return [
             'keep'    => $this->meta('keep', '0') === '1',
+            'go'      => $this->meta('go', '0') === '1',
             'opening' => \max(0.0, (float)$this->meta('opening', '0')),
             'ending'  => \max(0.0, (float)$this->meta('ending', '0')),
         ];
@@ -96,11 +98,12 @@ final class Db
 
     /**
      * @param  array<string,mixed> $in
-     * @return array{keep:bool,opening:float,ending:float}
+     * @return array{keep:bool,go:bool,opening:float,ending:float}
      */
     public function setSettings(array $in): array
     {
         $this->setMeta('keep', empty($in['keep']) ? '0' : '1');
+        $this->setMeta('go', empty($in['go']) ? '0' : '1');
         $this->setMeta('opening', (string)self::seconds($in['opening'] ?? 0));
         $this->setMeta('ending', (string)self::seconds($in['ending'] ?? 0));
         return $this->settings();
