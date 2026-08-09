@@ -55,6 +55,9 @@ final class Room
             /* Welches Video dieser Teilnehmer geladen hat. Null heisst: noch
                keines, der Raum wartet also gegebenenfalls auf ihn. */
             'ready' => null,
+            /* Wann zuletzt etwas von ihm kam. Bleibt es lange aus, ist die
+               Leitung tot und der Platz wird geraeumt. */
+            'seen'  => \microtime(true),
         ];
         $this->peers[$id] = $peer;
         $this->order[] = $id;

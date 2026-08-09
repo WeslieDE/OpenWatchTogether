@@ -2228,6 +2228,13 @@
   /* Laufende Uploads im festen Takt melden. */
   global.setInterval(shareUploads, net.UPLOAD_MS);
 
+  /* Lebenszeichen. Es traegt nichts bei sich und geht auch dann raus, wenn
+     gar kein Video anliegt - allein davon haengt ab, ob der Raum mich noch
+     fuer anwesend haelt. */
+  global.setInterval(function () {
+    if (S.joined) send("ping", {});
+  }, net.PING_MS);
+
   /* --------------------------------------------------------------- Start */
 
   i18n.onChange(refreshTexts);

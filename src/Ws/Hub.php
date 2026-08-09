@@ -24,7 +24,13 @@
  *
  *   Client an Server
  *     pos, video, take, name, upload, upload-end, changed, now, ready,
- *     settings, bye
+ *     ping, settings, bye
+ *
+ * Jede Nachricht gilt zugleich als Lebenszeichen. Wer sich zehn Sekunden gar
+ * nicht meldet, gilt als weg und wird aus dem Raum genommen - auch dann, wenn
+ * die Leitung nach aussen hin noch offen aussieht. Damit auch der still
+ * bleibt, der gerade nichts zu sagen hat, schickt jeder Browser im festen
+ * Takt ein "ping".
  *
  * Lautstaerke und Ton gehen bewusst nicht ueber die Leitung.
  */
@@ -37,6 +43,9 @@ use tk\weslie\WatchTogether\Rooms;
 
 final class Hub
 {
+    /** Solange darf ein Teilnehmer stumm bleiben, dann ist sein Platz frei. */
+    private const TIMEOUT = 10.0;
+
     /** @var array<string,Room> slug => Raum */
     private array $rooms = [];
 
@@ -111,8 +120,15 @@ final class Hub
         if ($room === null) {
             return;
         }
-        $id = $seat['peer'];
+        $this->part($room, $seat['slug'], $seat['peer']);
+    }
 
+    /**
+     * Ein Platz wird frei - ob die Leitung nun zugemacht wurde oder einfach
+     * verstummt ist. Was daran haengt, geht mit.
+     */
+    private function part(Room $room, string $slug, string $id): void
+    {
         /* Wer geht, nimmt seine laufenden Uebertragungen mit. */
         foreach ($room->uploads as $uid => $upload) {
             if ($upload['byId'] === $id) {
@@ -127,16 +143,16 @@ final class Hub
             $this->broadcast($room, 'master', ['id' => $room->master]);
         }
 
-        Rooms::touch($seat['slug']);
+        Rooms::touch($slug);
 
         /* Leerer Raum: der Zustand wird vergessen. Die Warteschlange bleibt,
            bis sie abgelaufen ist. Wo das Video stand, wird gemerkt, damit die
            Runde spaeter an derselben Stelle weiterschauen kann. */
         if ($room->empty()) {
-            $db = Db::of($seat['slug']);
+            $db = Db::of($slug);
             $db->keepMark($db->meta('now'), $room->videoTime());
-            unset($this->rooms[$seat['slug']]);
-            Db::forget($seat['slug']);
+            unset($this->rooms[$slug]);
+            Db::forget($slug);
         }
     }
 
@@ -153,14 +169,20 @@ final class Hub
             return;
         }
 
+        $id   = $seat['peer'];
+        $slug = $seat['slug'];
+
+        /* Da war jemand. Das allein haelt seinen Platz im Raum frei. */
+        if (isset($room->peers[$id])) {
+            $room->peers[$id]['seen'] = \microtime(true);
+        }
+
         $msg = \json_decode($raw, true);
         if (!\is_array($msg) || !isset($msg['type'])) {
             return;
         }
         $type = (string)$msg['type'];
         $d    = \is_array($msg['data'] ?? null) ? $msg['data'] : [];
-        $id   = $seat['peer'];
-        $slug = $seat['slug'];
 
         switch ($type) {
 
@@ -274,6 +296,10 @@ final class Hub
                 ], $id);
                 break;
 
+            /* Nur ein Lebenszeichen. Es ist oben schon vermerkt. */
+            case 'ping':
+                break;
+
             /* Einstellungen des Raumes. Sie gelten fuer alle, also darf sie
                auch jeder setzen - wie das Entfernen eines Videos. Der neue
                Stand geht an alle zurueck, den Absender eingeschlossen, damit
@@ -307,6 +333,31 @@ final class Hub
                 $out[$id] = \round((float)$peer['pos'], 3);
             }
             $this->broadcast($room, 'pos', $out);
+        }
+    }
+
+    /**
+     * Wer sich zehn Sekunden nicht geruehrt hat, ist weg. Ein abgerissenes
+     * Netz meldet sich nicht ab: die Leitung sieht dann noch eine ganze Weile
+     * offen aus, waehrend der Raum auf jemanden wartet, der laengst nicht mehr
+     * da ist. Also zaehlt hier nicht die Leitung, sondern das letzte Wort.
+     */
+    public function tickTimeouts(): void
+    {
+        $limit = \microtime(true) - self::TIMEOUT;
+
+        foreach ($this->rooms as $slug => $room) {
+            foreach ($room->peers as $id => $peer) {
+                if ((float)$peer['seen'] >= $limit) {
+                    continue;
+                }
+                $conn = $peer['conn'];
+                unset($this->seats[$conn->id]);
+                $this->part($room, $slug, $id);
+                /* Das Zumachen loest kein zweites Aufraeumen aus: der Platz
+                   ist oben schon abgemeldet. */
+                $conn->close();
+            }
         }
     }
 

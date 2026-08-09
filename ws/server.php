@@ -45,9 +45,11 @@ $worker->onClose = function ($conn) use ($hub): void {
 };
 
 $worker->onWorkerStart = function () use ($hub): void {
-    /* Positionen der Teilnehmer, einmal pro Sekunde. */
+    /* Positionen der Teilnehmer, einmal pro Sekunde. Im selben Takt wird
+       geprueft, von wem schon zu lange nichts mehr kam. */
     Timer::add(1.0, function () use ($hub): void {
         $hub->tickPositions();
+        $hub->tickTimeouts();
     });
 
     /* Liegengebliebene Teildateien, alle 15 Minuten. */

@@ -21,7 +21,12 @@
 
      Client an Server
        pos, video, take, name, upload, upload-end, changed, now, ready,
-       settings, bye
+       ping, settings, bye
+
+   Das "ping" traegt nichts bei sich. Es sagt nur, dass es diesen Browser noch
+   gibt: der Raum nimmt heraus, von wem zehn Sekunden lang gar nichts kam. Ohne
+   das bliebe sitzen, wer laengst kein Netz mehr hat - eine abgerissene Leitung
+   sieht von aussen noch eine ganze Weile offen aus.
 
    Lautstaerke und Ton gehen bewusst nicht ueber die Leitung. Jeder regelt
    fuer sich, die Einstellung wird nie gesendet.
@@ -38,6 +43,9 @@
   var MASTER_MS = 2000;   /* der Taktgeber meldet seinen Zustand */
   var POS_MS    = 1000;   /* jeder meldet seine eigene Position  */
   var UPLOAD_MS = 2000;   /* laufende Uploads melden ihren Stand */
+  /* Lebenszeichen. Der Raum wartet zehn Sekunden - es duerfen also fuenf
+     hintereinander ausbleiben, bevor jemand herausfaellt. */
+  var PING_MS   = 2000;
 
   var RETRY_MIN = 1000;
   var RETRY_MAX = 15000;
@@ -157,7 +165,8 @@
     connect: connect,
     MASTER_MS: MASTER_MS,
     POS_MS: POS_MS,
-    UPLOAD_MS: UPLOAD_MS
+    UPLOAD_MS: UPLOAD_MS,
+    PING_MS: PING_MS
   };
 
 })(window);
