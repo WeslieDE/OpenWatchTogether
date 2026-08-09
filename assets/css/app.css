@@ -885,6 +885,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .up-row-size { font-size: 12px; color: var(--text-3); }
 .up-row-state { font-size: 12px; color: var(--text-2); min-width: 42px; text-align: right; }
 .up-row-state.is-done { color: var(--ok); }
+.up-row-state.is-converting { color: var(--accent); }
 .up-row-state svg { width: 15px; height: 15px; vertical-align: -3px; }
 .up-row-gap { width: 26px; }
 .up-row-bar {

@@ -21,6 +21,7 @@
   var net  = WT.net;
   var i18n = WT.i18n;
   var names = WT.names;
+  var transcode = WT.transcode;
   var t    = i18n.t;
 
   var tc = M.timecode;
@@ -1923,7 +1924,10 @@
   /* ---------------------------------------------------------------- Upload */
 
   function activeJobs() {
-    return S.jobs.filter(function (j) { return j.state === "waiting" || j.state === "running"; });
+    return S.jobs.filter(function (j) {
+      return j.state === "waiting" || j.state === "running" ||
+             j.state === "needsConvert" || j.state === "converting";
+    });
   }
 
   function openUpload() {
@@ -1970,11 +1974,15 @@
     if (el.inpFile.files) pickFiles(el.inpFile.files);
   });
 
-  /* Nur was der Browser ohne Umwandlung abspielt, darf hoch. */
+  /* Nur was der Browser ohne Umwandlung abspielt, darf hoch - mkv/avi gehen
+     den Umweg ueber transcode.js und laufen als "convert" durch. */
   var probe = doc.createElement("video");
-  var OTHER_VIDEO = /^(mkv|avi|wmv|flv|mpg|mpeg|ts|m2ts|mts|vob|3gp|divx|rm|rmvb|asf)$/;
+  var OTHER_VIDEO = /^(wmv|flv|mpg|mpeg|ts|m2ts|mts|vob|3gp|divx|rm|rmvb|asf)$/;
 
   function playable(file) {
+    if (transcode.needsConversion(file)) {
+      return transcode.isMobile() ? "mobile" : "convert";
+    }
     var ext = (file.name.split(".").pop() || "").toLowerCase();
     var entry = null;
     for (var i = 0; i < PLAYABLE.length; i++) {
@@ -1988,7 +1996,10 @@
     return probe.canPlayType(mime) ? "ok" : "format";
   }
 
-  var REASON = { novideo: "up.errVideo", format: "up.errType", size: "up.errSize" };
+  var REASON = {
+    novideo: "up.errVideo", format: "up.errType", size: "up.errSize",
+    mobile: "up.errMobile"
+  };
 
   function cleanTitle(fileName) {
     return fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || fileName;
@@ -2003,13 +2014,13 @@
     for (var i = 0; i < list.length; i++) {
       var file = list[i];
       var verdict = playable(file);
-      if (verdict === "ok" && max > 0 && file.size > max) verdict = "size";
-      if (verdict !== "ok") {
+      if ((verdict === "ok" || verdict === "convert") && max > 0 && file.size > max) verdict = "size";
+      if (verdict !== "ok" && verdict !== "convert") {
         skipped.push(file.name);
         if (!firstReason) firstReason = verdict;
         continue;
       }
-      picked.push(file);
+      picked.push({ file: file, convert: verdict === "convert" });
     }
 
     if (!picked.length) {
@@ -2029,8 +2040,9 @@
 
   var batchDone = [];
 
-  function startBatch(files) {
-    files.forEach(function (file) {
+  function startBatch(picks) {
+    picks.forEach(function (pick) {
+      var file = pick.file;
       var entry = {
         id: "u" + (++S.seq) + "-" + Math.random().toString(36).slice(2, 6),
         name: file.name,
@@ -2039,7 +2051,8 @@
         title: cleanTitle(file.name),
         sent: 0,
         speed: 0,
-        state: "waiting",
+        state: pick.convert ? "needsConvert" : "waiting",
+        convertPct: 0,
         sentPct: -1,
         mark: 0,
         markAt: 0,
@@ -2068,14 +2081,44 @@
     return active.length ? active[0].name : "";
   }
 
+  /* mkv/avi erst zu mp4 machen, bevor es wie gewohnt hochgeht. Laeuft lokal,
+     der Server bekommt nachher ein ganz normales mp4 zu sehen. */
+  function convertJob(job) {
+    job.state = "converting";
+    job.convertPct = 0;
+    renderJobs();
+
+    job.task = transcode.convert(job.file, function (frac) {
+      job.convertPct = Math.round(frac * 100);
+      paintJobs();
+    });
+
+    job.task.promise.then(function (converted) {
+      job.file = converted;
+      job.size = converted.size;
+      job.state = "waiting";
+      job.task = null;
+      renderJobs();
+      pump();
+    }, function (err) {
+      job.task = null;
+      if (err && err.reason === "aborted") { pump(); return; }
+      failJob(job, err);
+      pump();
+    });
+  }
+
   /* Eine Datei nach der anderen. */
   function pump() {
     var job = null;
     for (var i = 0; i < S.jobs.length; i++) {
-      if (S.jobs[i].state === "waiting") { job = S.jobs[i]; break; }
-      if (S.jobs[i].state === "running") return;   /* laeuft schon eine */
+      var st = S.jobs[i].state;
+      if (st === "waiting" || st === "needsConvert") { job = S.jobs[i]; break; }
+      if (st === "running" || st === "converting") return;   /* laeuft schon eine */
     }
     if (!job) { endBatch(); return; }
+
+    if (job.state === "needsConvert") { convertJob(job); return; }
 
     job.state = "running";
     job.markAt = Date.now();
@@ -2167,19 +2210,27 @@
     }
   }
 
+  function jobPct(job) {
+    if (job.state === "converting") return job.convertPct || 0;
+    if (job.state === "needsConvert" || job.state === "waiting") return 0;
+    return job.size ? (job.sent / job.size) * 100 : 0;
+  }
+
   function jobState(job) {
     if (job.state === "done") return icon("i-check");
-    if (job.state === "waiting") return esc(t("up.waiting"));
-    return Math.round(job.size ? (job.sent / job.size) * 100 : 0) + " %";
+    if (job.state === "converting") return esc(t("up.converting", { n: job.convertPct || 0 }));
+    if (job.state === "needsConvert" || job.state === "waiting") return esc(t("up.waiting"));
+    return Math.round(jobPct(job)) + " %";
   }
 
   function renderJobs() {
     el.upList.innerHTML = S.jobs.map(function (j) {
-      var pct = j.size ? (j.sent / j.size) * 100 : 0;
+      var pct = jobPct(j);
       return '<li class="up-row" data-job="' + j.id + '">' +
         '<span class="up-row-name">' + esc(j.name) + "</span>" +
         '<span class="up-row-size mono">' + bytes(j.size) + "</span>" +
-        '<span class="up-row-state mono' + (j.state === "done" ? " is-done" : "") + '">' +
+        '<span class="up-row-state mono' + (j.state === "done" ? " is-done" : "") +
+          (j.state === "converting" ? " is-converting" : "") + '">' +
           jobState(j) + "</span>" +
         (j.state === "done" ? '<span class="up-row-gap"></span>'
           : '<button class="icon-btn icon-btn-xs up-row-x" data-cancel="' + j.id +
@@ -2193,8 +2244,7 @@
     S.jobs.forEach(function (j) {
       var row = el.upList.querySelector('[data-job="' + j.id + '"]');
       if (!row) return;
-      var pct = j.size ? (j.sent / j.size) * 100 : 0;
-      row.querySelector(".up-row-bar i").style.width = pct + "%";
+      row.querySelector(".up-row-bar i").style.width = jobPct(j) + "%";
       var st = row.querySelector(".up-row-state");
       if (j.state !== "done") st.textContent = jobState(j);
     });
@@ -2227,7 +2277,7 @@
     renderJobs();
     paintUpload();
     el.miniName.textContent = miniLabel();
-    if (job.state === "running") pump();
+    if (job.state === "running" || job.state === "converting") pump();
     else if (!activeJobs().length) endBatch();
   }
 
@@ -2397,6 +2447,13 @@
     el.btnMute.classList.toggle("is-muted", surface.muted);
 
     applyWide(stored(STORE_WIDE) === "1");
+
+    /* mkv/avi laufen vor dem Hochladen durch transcode.js - das kann nur
+       der Schreibtisch leisten, auf dem Handy bleibt die Auswahl eng. */
+    if (!transcode.isMobile()) {
+      el.inpFile.setAttribute("accept", el.inpFile.getAttribute("accept") +
+        ",video/x-matroska,video/x-msvideo,.mkv,.avi");
+    }
 
     rollRooms();
     rollNames();

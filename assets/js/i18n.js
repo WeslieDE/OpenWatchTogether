@@ -132,6 +132,8 @@
       "up.errVideo":  "Das sieht nicht nach einem Video aus.",
       "up.errType":   "Dieses Format kann der Browser nicht direkt abspielen. Nimm MP4, WebM oder OGG.",
       "up.errSize":   "Die Datei ist zu groß.",
+      "up.errMobile": "MKV/AVI lassen sich auf dem Handy nicht umwandeln. Bitte am Rechner hochladen oder vorher zu MP4 machen.",
+      "up.converting": "wandelt um {n} %",
       "up.ready":     "„{title}“ ist in der Warteschlange.",
       "up.readyN":    "{n} Videos sind in der Warteschlange.",
 
@@ -283,6 +285,8 @@
       "up.errVideo":  "That does not look like a video.",
       "up.errType":   "Your browser cannot play this format directly. Use MP4, WebM or OGG.",
       "up.errSize":   "The file is too large.",
+      "up.errMobile": "MKV/AVI can't be converted on mobile. Upload from a desktop, or convert to MP4 first.",
+      "up.converting": "converting {n}%",
       "up.ready":     "“{title}” is queued.",
       "up.readyN":    "{n} videos are queued.",
 
