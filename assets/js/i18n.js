@@ -116,6 +116,8 @@
       "log.del":    "Video entfernt: „{title}“",
       "log.switch": "Video gewechselt: „{title}“",
       "log.settings": "Raumeinstellungen geändert",
+      "log.liveStart": "Bildschirmübertragung gestartet",
+      "log.liveStop":  "Bildschirmübertragung beendet",
 
       "up.title":     "Video hinzufügen",
       "up.drop":      "Dateien hierher ziehen",
@@ -277,6 +279,8 @@
       "log.del":    "Video removed: “{title}”",
       "log.switch": "Switched video: “{title}”",
       "log.settings": "Room settings changed",
+      "log.liveStart": "Screen sharing started",
+      "log.liveStop":  "Screen sharing stopped",
 
       "up.title":     "Add video",
       "up.drop":      "Drag files here",

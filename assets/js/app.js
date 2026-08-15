@@ -457,15 +457,18 @@
          tun. */
       case "live":
         var wasLive = S.live.on;
+        var prevLiveBy = S.live.byId;
         S.live = { on: !!d.on, byId: d.byId || null };
         renderLiveUi();
         if (S.live.on && !wasLive) {
+          logAdd("log.liveStart", "", logWho(S.live.byId));
           if (S.live.byId !== S.me.id) {
             startWatching();
             var sp = peerById(S.live.byId);
             toast(t("toast.liveStarted", { name: sp ? sp.name : "" }), "i-live");
           }
         } else if (!S.live.on && wasLive) {
+          logAdd("log.liveStop", "", logWho(prevLiveBy));
           stopLiveLocal();
           toast(t("toast.liveStopped"), "i-live");
         }
