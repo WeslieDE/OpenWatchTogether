@@ -60,6 +60,11 @@ final class Api
                 'url'  => (string)Config::get('wsUrl'),
                 'port' => (int)Config::get('wsPort'),
             ],
+            /* Signalisierung fuer die Bildschirmuebertragung (SFU). */
+            'sfu'        => [
+                'url'  => (string)Config::get('sfuWsUrl'),
+                'port' => (int)Config::get('sfuWsPort'),
+            ],
             'maxBytes'   => (int)Config::get('maxBytes'),
             'chunkBytes' => (int)Config::get('chunkBytes'),
             /* Fehlt ffmpeg, steuert der Browser Laufzeit und Bild selbst bei. */

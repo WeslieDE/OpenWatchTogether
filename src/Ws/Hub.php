@@ -18,6 +18,9 @@
  *     ready       jemand hat das laufende Video geladen
  *     go          jemand hat sein Zeichen im Bereit-Modus umgelegt
  *     settings    Einstellungen des Raumes, sobald jemand sie geaendert hat
+ *     live        Bildschirmuebertragung an/aus, und von wem
+ *     live-token  nur an den Sender: Token fuer den SFU-Prozess
+ *     live-status jemand meldet, ob seine Verbindung zum SFU steht
  *
  * Wird der letzte Teilnehmer verabschiedet, bleibt die Stelle des laufenden
  * Videos in der Datenbank des Raumes stehen. Wer den Raum wieder aufweckt,
@@ -25,7 +28,7 @@
  *
  *   Client an Server
  *     pos, video, take, name, upload, upload-end, changed, now, ready, go,
- *     ping, settings, bye
+ *     ping, settings, bye, live-start, live-stop, live-status
  *
  * Jede Nachricht gilt zugleich als Lebenszeichen. Wer sich zehn Sekunden gar
  * nicht meldet, gilt als weg und wird aus dem Raum genommen - auch dann, wenn
@@ -39,6 +42,7 @@ declare(strict_types=1);
 
 namespace tk\weslie\WatchTogether\Ws;
 
+use tk\weslie\WatchTogether\Config;
 use tk\weslie\WatchTogether\Db;
 use tk\weslie\WatchTogether\Rooms;
 
@@ -105,6 +109,7 @@ final class Hub
             'now'      => $db->meta('now'),
             'resume'   => \round($resume, 3),
             'settings' => $db->settings(),
+            'live'     => ['on' => $room->live, 'byId' => $room->liveBy],
         ]);
 
         $this->broadcast($room, 'joined', [
@@ -139,6 +144,13 @@ final class Hub
                 unset($room->uploads[$uid]);
                 $this->broadcast($room, 'upload-end', ['id' => $uid, 'ok' => false]);
             }
+        }
+
+        /* Geht der Sender selbst, ist damit auch die Bildschirmuebertragung
+           vorbei - niemand sonst kann sie fortsetzen. */
+        if ($room->live && $room->liveBy === $id) {
+            $room->stopLive();
+            $this->broadcast($room, 'live', ['on' => false, 'byId' => null]);
         }
 
         $wasMaster = $room->drop($id);
@@ -215,6 +227,13 @@ final class Hub
             case 'take':
                 if ($room->master === $id) {
                     break;
+                }
+                /* Ein Sender gehoert zum jeweiligen Taktgeber. Wechselt der,
+                   ist die laufende Uebertragung vorbei - niemand sonst kann
+                   sie fortsetzen. */
+                if ($room->live) {
+                    $room->stopLive();
+                    $this->broadcast($room, 'live', ['on' => false, 'byId' => null]);
                 }
                 /* Der Stand wird eingefroren, damit der Wechsel nichts verschiebt. */
                 $room->setVideo($room->video['playing'], $room->videoTime());
@@ -326,6 +345,45 @@ final class Hub
                 ));
                 break;
 
+            /* Der Taktgeber will seinen Bildschirm uebertragen - oder,
+               waehrend das schon laeuft, sich ein frisches Token holen (etwa
+               nach einem Abriss der SFU-Verbindung). Beides laeuft ueber
+               dieselbe Nachricht, der Zustand aendert sich dabei hoechstens
+               beim allerersten Mal. */
+            case 'live-start':
+                if ($room->master !== $id) {
+                    break;
+                }
+                $wasLive = $room->live;
+                $room->live = true;
+                $room->liveBy = $id;
+                if (!$wasLive) {
+                    $this->broadcast($room, 'live', ['on' => true, 'byId' => $id]);
+                }
+                $this->to($conn, 'live-token', $this->liveToken($slug, $id));
+                break;
+
+            case 'live-stop':
+                if ($room->master !== $id || !$room->live) {
+                    break;
+                }
+                $room->stopLive();
+                $this->broadcast($room, 'live', ['on' => false, 'byId' => null]);
+                break;
+
+            /* Der eigene Stand der SFU-Verbindung. Nur von Belang, waehrend
+               eine Uebertragung laeuft - der Server nimmt ihn aber immer an,
+               damit kein Wettlauf mit dem "live" entsteht. Anders als bei
+               "ready"/"go" setzt der Browser seinen eigenen Punkt nicht schon
+               von sich aus - die Antwort geht deshalb an alle zurueck, den
+               Absender eingeschlossen, wie bei "settings". */
+            case 'live-status':
+                $room->peers[$id]['connected'] = !empty($d['connected']);
+                $this->broadcast($room, 'live-status', [
+                    'id' => $id, 'connected' => $room->peers[$id]['connected'],
+                ]);
+                break;
+
             case 'bye':
                 $conn->close();
                 break;
@@ -340,7 +398,9 @@ final class Hub
     public function tickPositions(): void
     {
         foreach ($this->rooms as $room) {
-            if ($room->empty()) {
+            /* Waehrend einer Bildschirmuebertragung gibt es keine Position,
+               die sich anzugleichen lohnte. */
+            if ($room->empty() || $room->live) {
                 continue;
             }
             $out = [];
@@ -382,6 +442,21 @@ final class Hub
     {
         $db = Db::of($room->slug);
         $this->broadcast($room, 'queue', ['items' => $db->queue()]);
+    }
+
+    /**
+     * Erlaubnis fuer den SFU-Prozess, einen bestimmten Peer als Sender in
+     * einem bestimmten Raum zu akzeptieren. Der Prozess laeuft getrennt und
+     * kennt weder Raeume noch Taktgeber - er prueft nur, ob die Unterschrift
+     * zum gemeinsamen Geheimnis passt und die Frist noch steht.
+     *
+     * @return array{room:string,peer:string,exp:int,sig:string}
+     */
+    private function liveToken(string $slug, string $peerId, int $ttl = 30): array
+    {
+        $exp = \time() + $ttl;
+        $sig = \hash_hmac('sha256', $slug . '|' . $peerId . '|' . $exp, (string)Config::get('sfuSecret'));
+        return ['room' => $slug, 'peer' => $peerId, 'exp' => $exp, 'sig' => $sig];
     }
 
     private function broadcast(Room $room, string $type, array $data, ?string $except = null): void

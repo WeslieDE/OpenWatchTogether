@@ -49,6 +49,17 @@ final class Config
             'wsPort'    => (int)(self::env('WT_WS_PORT') ?? 8081),
             'wsUrl'     => self::env('WT_WS_URL') ?? '',
 
+            /* Signalisierung des SFU (mediasoup, eigener Node-Prozess). Gleiches
+               Muster wie die Live-Verbindung: leer heisst aus der Adresse
+               ableiten, ein Pfad heisst hinter demselben Webserver. */
+            'sfuWsPort' => (int)(self::env('WT_SFU_WS_PORT') ?? 8082),
+            'sfuWsUrl'  => self::env('WT_SFU_WS_URL') ?? '',
+
+            /* Von Hub.php ausgestellte Tokens fuer den Sender (HMAC), vom
+               SFU-Prozess mit demselben Wert geprueft. Leer heisst: wie beim
+               Rest der App gibt es keinen Passwortschutz. */
+            'sfuSecret' => self::env('WT_SFU_SECRET') ?? '',
+
             /* Bild und Laufzeit. Leer heisst: der Browser springt ein. */
             'ffmpeg'    => self::env('WT_FFMPEG')  ?? self::bundled('ffmpeg'),
             'ffprobe'   => self::env('WT_FFPROBE') ?? self::bundled('ffprobe'),

@@ -44,8 +44,8 @@ file.
 ## Install with Docker
 
 Everything runs in a **single container**: Apache with the API, and next to it
-the long-running process for the live connection, both kept alive by
-`supervisord`.
+the long-running process for the live connection and the SFU process for
+screen sharing, all three kept alive by `supervisord`.
 
 ```bash
 git clone https://github.com/WeslieDE/OpenWatchTogether.git
@@ -60,6 +60,11 @@ URL from your address bar to whoever should join.
 
 Use a different port by changing the left half of `-p`, e.g. `-p 9000:80` for
 <http://localhost:9000>.
+
+> **Screen sharing needs one more port.** The room master can share their
+> screen over WebRTC — see [Screen sharing (livestream)](livestream.md) for
+> the extra port (`-p 42000:42000/udp -p 42000:42000/tcp` by default) and the
+> `WT_SFU_ANNOUNCED_IP` variable it needs pointed at your public IP.
 
 > **No volume needed — on purpose.**
 > Watch Together is designed to be disposable. Rooms and videos live as long as
@@ -271,6 +276,11 @@ Every setting is an environment variable, and every one has a sensible default.
 | `WT_WS_PORT` | `8081` | Port of the live process |
 | `WT_FFMPEG` | `tools/ffmpeg/bin`, else `PATH` | Path to `ffmpeg` |
 | `WT_FFPROBE` | same | Path to `ffprobe` |
+| `WT_SFU_WS_URL` | `/sfu-ws` in Docker, empty otherwise | Address the browser uses for the screen-sharing signalling connection |
+| `WT_SFU_WS_PORT` | `8082` | Port of the SFU signalling process |
+| `WT_SFU_PORT` | `42000` | Shared UDP/TCP media port for screen sharing — the one extra port to publish |
+| `WT_SFU_ANNOUNCED_IP` | *(unset)* | Public IP/hostname the SFU announces to browsers — **required** for screen sharing to work outside your own machine |
+| `WT_SFU_SECRET` | *(empty)* | Shared secret between the live connection and the SFU process; see [Screen sharing](livestream.md) |
 
 ### Upload limits
 
@@ -373,6 +383,7 @@ Browser  ─────────┤                                         
 |---|---|
 | Page & API | PHP 8 behind Apache/nginx — plain request/response, no framework |
 | Live connection | A long-running PHP process using [Workerman](https://github.com/walkor/workerman) |
+| Screen sharing (SFU) | A long-running Node.js process using [mediasoup](https://mediasoup.org), see [Screen sharing](livestream.md) |
 | Per-room storage | One SQLite file per room (`room.sqlite`) |
 | Runtime & thumbnails | `ffmpeg` / `ffprobe`, called once per upload |
 
@@ -422,6 +433,9 @@ Only what is necessary travels over the wire.
 | `upload` / `upload-end` | A transfer's progress, and its end or abort |
 | `queue` | The queue, whenever it changed |
 | `now` | Which video is playing |
+| `live` | Screen sharing on/off, and who's sending — see [Screen sharing](livestream.md) |
+| `live-token` | Sender only: the signed token for the SFU process |
+| `live-status` | Somebody's SFU connection came up or dropped |
 
 **Client → server**
 
@@ -434,6 +448,8 @@ Only what is necessary travels over the wire.
 | `upload` / `upload-end` | Own transfer's progress, every 2 seconds, and its end |
 | `changed` | Something about the queue changed |
 | `now` | Pacesetter only: which video is playing |
+| `live-start` / `live-stop` | Master only: start or stop screen sharing |
+| `live-status` | Own SFU connection state |
 | `bye` | Close the connection |
 
 **Volume and mute are deliberately never sent.** Everyone controls their own

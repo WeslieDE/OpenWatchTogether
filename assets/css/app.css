@@ -179,6 +179,10 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .btn-ghost { color: var(--text-2); }
 .btn-ghost:hover { background: var(--surface-3); color: var(--text); }
 
+/* Laeuft die Uebertragung schon, wird aus dem Startknopf ein Beenden-Knopf. */
+#btnLive.is-live { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+#btnLive.is-live:hover { background: var(--bad-soft); filter: brightness(0.96); }
+
 .btn-sm { height: 34px; padding: 0 12px; font-size: 13.5px; }
 .btn-block { width: 100%; }
 
@@ -556,6 +560,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 /* Zweite Marke, wenn die Verbindung haengt. Steht neben der ersten. */
 .stage-badge-warn { left: auto; right: 12px; }
 .stage-badge-warn .pulse { background: var(--accent); }
+/* Live-Marke: eigene Farbe, damit sie sich von Sync/Warten unterscheidet. */
+.stage-badge-live .pulse { background: var(--bad); }
 @keyframes badge-in { from { opacity: 0; transform: translateY(-6px) } }
 .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-hi); flex: none; }
 @media (prefers-reduced-motion: no-preference) {
@@ -740,6 +746,12 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .v-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .v-you { font-size: 11.5px; color: var(--text-3); flex: none; }
 .v-pos { font-family: var(--mono); font-size: 13px; color: var(--text-2); text-align: right; white-space: nowrap; }
+
+/* Waehrend eines Livestreams steht hier statt der Position ein Punkt: gruen
+   heisst verbunden, rot heisst nicht (mehr). */
+.v-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.v-dot-on  { background: var(--ok); }
+.v-dot-off { background: var(--bad); }
 
 .viewers tr.is-master { background: var(--accent-soft); }
 .viewers tr.is-master .v-name { color: var(--accent); font-weight: 600; }
@@ -961,8 +973,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
   .layout { padding: 14px 12px 20px; }
   .topbar { padding: 0 12px; gap: 10px; }
   .brand-name { display: none; }
-  .btn-accent#btnAdd span { display: none; }
-  .btn-accent#btnAdd { width: 34px; padding: 0; }
+  .btn-accent#btnAdd span, .btn-soft#btnLive span { display: none; }
+  .btn-accent#btnAdd, .btn-soft#btnLive { width: 34px; padding: 0; }
   .me-name { display: none; }
   .me-chip { padding: 0 4px; }
   .stage { border-radius: var(--r-control); }

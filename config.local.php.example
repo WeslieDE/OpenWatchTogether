@@ -20,6 +20,16 @@ return [
     // 'wsUrl'  => '',
     // 'wsPort' => 8081,
 
+    /* Adresse der SFU-Signalisierung (Bildschirmuebertragung), gleiches
+       Muster wie 'wsUrl'/'wsPort'. */
+    // 'sfuWsUrl'  => '',
+    // 'sfuWsPort' => 8082,
+
+    /* Von Hub.php ausgestellte Tokens fuer den Sender (HMAC), vom
+       SFU-Prozess (sfu/server.js, gleicher Wert in WT_SFU_SECRET) geprueft.
+       Leer heisst: wie beim Rest der App gibt es keinen Passwortschutz. */
+    // 'sfuSecret' => '',
+
     /* ffmpeg. Ohne Angabe wird tools/ffmpeg/bin genommen, sonst der PATH. */
     // 'ffmpeg'  => 'C:/ffmpeg/bin/ffmpeg.exe',
     // 'ffprobe' => 'C:/ffmpeg/bin/ffprobe.exe',

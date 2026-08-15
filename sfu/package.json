@@ -1,0 +1,16 @@
+{
+  "name": "tk.weslie.watch-together-sfu",
+  "description": "SFU-Signalisierung fuer die Bildschirmuebertragung in Watch Together. Laeuft neben dem PHP-Prozess im selben Container.",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "mediasoup": "^3.14.0",
+    "ws": "^8.18.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

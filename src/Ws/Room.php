@@ -34,6 +34,10 @@ final class Room
     /** @var array<string,array<string,mixed>> laufende Uebertragungen */
     public array $uploads = [];
 
+    /** Laeuft gerade eine Bildschirmuebertragung, und wer sie ueberhaupt sendet. */
+    public bool $live = false;
+    public ?string $liveBy = null;
+
     private int $colors = 0;
 
     public function __construct(string $slug)
@@ -61,6 +65,9 @@ final class Room
             /* Wann zuletzt etwas von ihm kam. Bleibt es lange aus, ist die
                Leitung tot und der Platz wird geraeumt. */
             'seen'  => \microtime(true),
+            /* Steht seine Verbindung zum SFU, waehrend eine Uebertragung
+               laeuft? Meldet er selbst, siehe "live-status". */
+            'connected' => false,
         ];
         $this->peers[$id] = $peer;
         $this->order[] = $id;
@@ -128,6 +135,7 @@ final class Room
                 'color' => $this->peers[$id]['color'],
                 'ready' => $this->peers[$id]['ready'],
                 'go'    => $this->peers[$id]['go'],
+                'connected' => $this->peers[$id]['connected'],
             ];
         }
         return $out;
@@ -168,5 +176,17 @@ final class Room
     public function videoState(): array
     {
         return ['playing' => $this->video['playing'], 't' => \round($this->videoTime(), 3)];
+    }
+
+    /* ------------------------------------------------------------- Live -- */
+
+    /** Uebertragung vorbei - ob gewollt beendet oder weil der Sender ging. */
+    public function stopLive(): void
+    {
+        $this->live = false;
+        $this->liveBy = null;
+        foreach (\array_keys($this->peers) as $id) {
+            $this->peers[$id]['connected'] = false;
+        }
     }
 }

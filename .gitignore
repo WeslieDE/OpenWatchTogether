@@ -2,6 +2,9 @@
 /vendor/
 composer.phar
 
+# Node packages fuer den SFU-Prozess - installiert mit `npm install`
+/sfu/node_modules/
+
 # Portable ffmpeg for local development on Windows
 /tools/
 

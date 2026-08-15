@@ -22,6 +22,7 @@
   var i18n = WT.i18n;
   var names = WT.names;
   var transcode = WT.transcode;
+  var webrtc = WT.webrtc;
   var t    = i18n.t;
 
   var tc = M.timecode;
@@ -71,6 +72,8 @@
     jobs: [],             /* eigene Uploads mit Datei und Fortschritt */
     current: null,
     nowId: null,
+    /* Bildschirmuebertragung: laeuft sie, und von wem. */
+    live: { on: false, byId: null },
     waiting: null,        /* auf dieses Video warten noch Teilnehmer */
     correcting: 0,
     silentTake: false,
@@ -111,13 +114,14 @@
     app: $("app"),
     roomName: $("roomName"), btnCopyLink: $("btnCopyLink"),
     btnAdd: $("btnAdd"), btnAddEmpty: $("btnAddEmpty"), btnAddQueue: $("btnAddQueue"),
+    btnLive: $("btnLive"),
     btnTheme: $("btnTheme"), btnRename: $("btnRename"),
     meAvatar: $("meAvatar"), meName: $("meName"),
 
     stage: $("stage"), video: $("video"),
     stageEmpty: $("stageEmpty"), stageTap: $("stageTap"), stageStart: $("stageStart"),
     btnBigPlay: $("btnBigPlay"), badgeSync: $("badgeSync"), badgeLink: $("badgeLink"),
-    badgeWait: $("badgeWait"), badgeWaitText: $("badgeWaitText"),
+    badgeWait: $("badgeWait"), badgeWaitText: $("badgeWaitText"), badgeLive: $("badgeLive"),
     stageGo: $("stageGo"), btnGoBig: $("btnGoBig"), goBigText: $("goBigText"),
 
     controls: $("controls"), btnPlay: $("btnPlay"), tCur: $("tCur"), tDur: $("tDur"),
@@ -132,7 +136,7 @@
 
     logRows: $("logRows"), logCount: $("logCount"),
 
-    viewerRows: $("viewerRows"), viewerCount: $("viewerCount"),
+    viewerRows: $("viewerRows"), viewerCount: $("viewerCount"), viewerPosHead: $("viewerPosHead"),
     queue: $("queue"), queueCount: $("queueCount"), queueEmpty: $("queueEmpty"),
 
     mini: $("mini"), miniName: $("miniName"), miniBar: $("miniBar"),
@@ -216,6 +220,10 @@
   }
   function isMaster() { return S.masterId && S.masterId === S.me.id; }
 
+  /* Laeuft gerade eine Bildschirmuebertragung? Ein Livestream kennt weder
+     Pause noch Position - beides bleibt dafuer waehrenddessen gesperrt. */
+  function isLive() { return !!S.live.on; }
+
   /* Bedienen darf nur, wer den Takt vorgibt. Start, Pause, jeder Sprung und
      der Wechsel auf ein anderes Video gehen den ganzen Raum an - wer sie
      will, holt sich vorher die Steuerung. Frueher nahm ein Druck sie still
@@ -258,7 +266,10 @@
          dazugekommen ist, hat noch keines. */
       ready: raw.ready || null,
       /* Sein Zeichen im Bereit-Modus. */
-      go: !!raw.go
+      go: !!raw.go,
+      /* Steht seine Verbindung zum SFU? Nur waehrend eines Livestreams von
+         Belang, meldet jeder ueber sich selbst. */
+      connected: !!raw.connected
     };
   }
 
@@ -287,6 +298,12 @@
         S.queue = (d.queue || []).slice();
         S.settings = cleanSettings(d.settings);
         S.nowId = d.now || null;
+        /* Nach einem Abriss zaehlt nur noch der frische Stand - eine eigene
+           Uebertragung oder ein Zuschauen von vorher (neue Kennung, alte
+           SFU-Verbindung) wird verworfen, enterApp() baut es bei Bedarf mit
+           der neuen Kennung wieder auf. */
+        closeLiveMedia();
+        S.live = { on: !!(d.live && d.live.on), byId: (d.live && d.live.byId) || null };
         enterApp();
         /* Der mitgeschickte Stand gehoert zum mitgeschickten Video. */
         S.remoteFresh = true;
@@ -334,6 +351,7 @@
         el.badgeSync.hidden = true;
         renderViewers();
         renderTakeover();
+        renderLiveUi();
         if (d.id === S.me.id) {
           if (!S.silentTake) toast(t("toast.youControl"), "i-crown");
           S.silentTake = false;
@@ -429,6 +447,40 @@
           if (p && !p.isMe) { p.t = d[id]; p.at = stamp; }
         });
         break;
+
+      /* Bildschirmuebertragung an oder aus. Kommt auch beim eigenen Start
+         zurueck - dann steht schon alles Lokale, es gibt nur nichts mehr zu
+         tun. */
+      case "live":
+        var wasLive = S.live.on;
+        S.live = { on: !!d.on, byId: d.byId || null };
+        renderLiveUi();
+        if (S.live.on && !wasLive) {
+          if (S.live.byId !== S.me.id) {
+            startWatching();
+            var sp = peerById(S.live.byId);
+            toast(t("toast.liveStarted", { name: sp ? sp.name : "" }), "i-live");
+          }
+        } else if (!S.live.on && wasLive) {
+          stopLiveLocal();
+          toast(t("toast.liveStopped"), "i-live");
+        }
+        break;
+
+      /* Nur an den Sender: die Erlaubnis fuer den SFU-Prozess. */
+      case "live-token":
+        if (liveTokenWaiter) {
+          var giveToken = liveTokenWaiter;
+          liveTokenWaiter = null;
+          giveToken(d);
+        }
+        break;
+
+      /* Jemandes Verbindung zum SFU steht oder ist weg. */
+      case "live-status":
+        var lp = peerById(d.id);
+        if (lp) { lp.connected = !!d.connected; renderViewers(); }
+        break;
     }
   }
 
@@ -454,13 +506,17 @@
     return S.conn ? S.conn.send(type, data) : false;
   }
 
+  /* Waehrend eines Livestreams gibt es keine Position, die sich zu melden
+     oder anzugleichen lohnte. */
   function sendPos() {
+    if (isLive()) return;
     if (surface.settled) send("pos", { t: surface.position });
   }
 
   /* Der Taktgeber meldet Spielt/Pausiert samt Zeit: bei jeder Aenderung und
      zusaetzlich im festen Takt. */
   function sendVideo() {
+    if (isLive()) return;
     if (!isMaster() || !surface.settled) return;
     send("video", { playing: !surface.paused, t: surface.position });
   }
@@ -602,7 +658,7 @@
   /* Von Hand gestartet oder angehalten. Beides sticht das Warten auf die
      anderen aus: wer drueckt, will nicht warten. */
   function doPlay() {
-    if (!surface.ready) return;
+    if (!surface.ready || isLive()) return;
     if (!mayControl()) { denyControl(); return; }
     endWait();
     surface.play();
@@ -612,7 +668,7 @@
   }
 
   function doPause() {
-    if (!surface.ready) return;
+    if (!surface.ready || isLive()) return;
     if (!mayControl()) { denyControl(); return; }
     endWait();
     surface.pause();
@@ -633,7 +689,7 @@
   }
 
   function doSeek(tt) {
-    if (!surface.ready) return;
+    if (!surface.ready || isLive()) return;
     if (!mayControl()) { denyControl(); return; }
     surface.seek(tt);
     sendVideo();
@@ -657,8 +713,14 @@
     if (playing) blocked = false;
     el.btnPlay.classList.toggle("is-playing", playing);
     el.btnPlay.setAttribute("title", t(playing ? "ctl.pause" : "ctl.play"));
-    el.stageStart.hidden =
-      !(surface.ready && !playing && (mayControl() || blocked) && !goWaiting());
+    /* Waehrend eines Livestreams gilt derselbe Notnagel wie sonst: laesst der
+       Browser das Abspielen nicht von allein zu - beim Zuschauer besonders
+       oft, wenn er ohne frischen Klick dazukommt, etwa nach einem Neuladen -
+       kommt der grosse Knopf zurueck. Er ist dann der einzige Weg, ueberhaupt
+       ein Bild zu sehen. */
+    el.stageStart.hidden = isLive()
+      ? !blocked
+      : !(surface.ready && !playing && (mayControl() || blocked) && !goWaiting());
   }
 
   /* Durchgelaufen: der Taktgeber raeumt das Video weg und geht weiter. Die
@@ -709,6 +771,167 @@
     toast(t("toast.blocked"), "i-play");
   };
 
+  /* ------------------------------------------------------- Bildschirm live */
+
+  /* Nur der Taktgeber darf senden, und immer nur einer - eine Uebertragung
+     hat genau eine Quelle. Das SFU selbst kennt weder Raeume noch Master,
+     das entscheidet Hub.php: es haelt fest, ob und von wem gerade gesendet
+     wird, und stellt dem Sender ein Token aus (siehe "live-start"). Der
+     eigentliche Bild- und Tontransport laeuft dann direkt zwischen Browser
+     und SFU - der Haupt-Websocket sagt hier nur noch an, wer sich wo
+     anmelden darf. */
+
+  var liveStream = null;      /* eigener Bildschirm, nur beim Sender gesetzt */
+  var liveSession = null;     /* laufende SFU-Verbindung, Sender oder Zuschauer */
+  var liveTokenWaiter = null; /* wartet auf die Antwort von "live-start" */
+  var livePausedAt = 0;       /* Stelle des Warteschlangen-Videos, falls eines lief */
+
+  function renderLiveUi() {
+    var master = isMaster();
+    var live = isLive();
+    el.btnLive.hidden = !master;
+    el.btnLive.classList.toggle("is-live", live);
+    var label = el.btnLive.querySelector("span");
+    if (label) label.textContent = t(live ? "top.liveStop" : "top.live");
+    el.badgeLive.hidden = !live;
+    if (el.viewerPosHead) el.viewerPosHead.textContent = t(live ? "viewers.connected" : "viewers.pos");
+    renderLocks();
+    updatePlayUi();
+  }
+
+  /* Wird bei jedem (Wieder-)Aufbau der SFU-Verbindung als Sender gebraucht -
+     das SFU kennt keine Auffrischung, das entscheidet allein der Server. */
+  function requestLiveToken(cb) {
+    liveTokenWaiter = cb;
+    send("live-start", {});
+  }
+
+  function startBroadcast() {
+    if (!isMaster() || isLive() || !global.navigator.mediaDevices || !global.navigator.mediaDevices.getDisplayMedia) return;
+
+    global.navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).then(function (stream) {
+      liveStream = stream;
+
+      /* Das eigene Bild steht sofort, unabhaengig davon, ob die
+         SFU-Verbindung schon steht - und bleibt es auch, wenn sie zwischen-
+         durch abreisst. */
+      if (S.current) livePausedAt = surface.position;
+      surface.pause();
+      el.video.srcObject = stream;
+      el.video.muted = true;
+      el.video.hidden = false;
+      el.stageEmpty.hidden = true;
+      blocked = false;
+      el.video.play().then(function () {
+        blocked = false;
+        updatePlayUi();
+      }, function () {
+        /* Auch stumm blockt ein Browser mitunter ohne frischen Klick - dann
+           steht der grosse Knopf bereit, genau wie beim Zuschauer. */
+        blocked = true;
+        updatePlayUi();
+        toast(t("toast.blocked"), "i-play");
+      });
+
+      stream.getVideoTracks().forEach(function (track) {
+        /* Der Browser-eigene "Freigabe beenden"-Knopf zaehlt wie ein Druck
+           auf unseren. */
+        track.addEventListener("ended", function () { if (isLive()) stopBroadcast(); });
+      });
+
+      S.live = { on: true, byId: S.me.id };
+      renderLiveUi();
+
+      liveSession = webrtc.broadcast({
+        room: S.room, peer: S.me.id, stream: stream,
+        getToken: requestLiveToken,
+        onState: function (state) {
+          send("live-status", { connected: state === "open" || state === "back" });
+        }
+      });
+    }, function () {
+      toast(t("toast.liveFailed"), "i-live");
+    });
+  }
+
+  function stopBroadcast() {
+    if (!isLive() || S.live.byId !== S.me.id) return;
+    send("live-stop", {});
+    /* Das Aufraeumen selbst passiert einheitlich in stopLiveLocal(), sobald
+       die Bestaetigung ("live" aus) vom Server zurueckkommt - so sehen alle,
+       Sender eingeschlossen, denselben Weg. */
+  }
+
+  function startWatching() {
+    if (liveSession) return;
+    if (S.current) livePausedAt = surface.position;
+    surface.pause();
+    el.stageEmpty.hidden = true;
+    blocked = false;
+
+    liveSession = webrtc.watch({
+      room: S.room, peer: S.me.id,
+      onStream: function (stream) {
+        el.video.srcObject = stream;
+        el.video.hidden = false;
+        /* Ohne frischen Klick lehnt der Browser das Abspielen oft ab - vor
+           allem hier, wo man ohne jede Bedienung dazukommt (etwa nach einem
+           Neuladen, mit schon gemerktem Namen). Dann kommt der grosse Knopf,
+           genau wie sonst bei blockiertem Abspielen. */
+        el.video.play().then(function () {
+          blocked = false;
+          updatePlayUi();
+        }, function () {
+          blocked = true;
+          updatePlayUi();
+          toast(t("toast.blocked"), "i-play");
+        });
+      },
+      onState: function (state) {
+        send("live-status", { connected: state === "open" || state === "back" });
+      }
+    });
+  }
+
+  /* Nur die SFU-Seite abraeumen, ohne den Blick zurueck auf ein Warteschlangen-
+     Video - gebraucht beim "welcome", wenn ohnehin gleich applyNow() laedt. */
+  function closeLiveMedia() {
+    if (liveSession) { liveSession.close(); liveSession = null; }
+    if (liveStream) {
+      liveStream.getTracks().forEach(function (tr) { tr.stop(); });
+      liveStream = null;
+    }
+    el.video.srcObject = null;
+  }
+
+  /* Die Uebertragung ist vorbei - ob gewollt beendet, vom Server erzwungen
+     (etwa weil der Sender ging oder die Steuerung wechselte) oder weil man
+     selbst nur zugeschaut hat. Gilt fuer alle gleich. */
+  function stopLiveLocal() {
+    closeLiveMedia();
+    /* Das Zeichen galt dem Livebild, nicht der Warteschlange - sonst stuende
+       der grosse Knopf gleich aus falschem Grund wieder da. */
+    blocked = false;
+
+    if (S.current) {
+      resumeTo = livePausedAt;
+      surface.load(S.current);
+      el.stageEmpty.hidden = true;
+    } else {
+      surface.unload();
+      el.stageEmpty.hidden = false;
+    }
+    livePausedAt = 0;
+    updatePlayUi();
+    updateScrub();
+  }
+
+  el.btnLive.addEventListener("click", function () {
+    if (!isMaster()) { denyControl(); return; }
+    if (isLive()) stopBroadcast();
+    else startBroadcast();
+  });
+
   /* --------------------------------------------------------- Gemeinsam los */
 
   /* Ein anderes Video liegt an. Alle laden es erst einmal, und wer so weit
@@ -749,6 +972,7 @@
 
   /* Liegt es hier im Puffer, erfahren es die anderen. Einmal je Video. */
   function tellReady() {
+    if (isLive()) return;
     var id = S.current ? S.current.id : "";
     if (!id || toldReady === id || !surface.playable) return;
     if (!send("ready", { item: id })) return;   /* ohne Leitung spaeter erneut */
@@ -773,7 +997,7 @@
   /* Alle so weit? Dann geht es los. Diese Entscheidung faellt allein beim
      Taktgeber, die anderen kommen ueber seine Meldung mit. */
   function startWhenAllReady() {
-    if (!S.waiting || !isMaster()) return;
+    if (isLive() || !S.waiting || !isMaster()) return;
     if (!S.current || S.current.id !== S.waiting) return;
     if (readyCount() < S.peers.length) return;
     endWait();
@@ -784,6 +1008,7 @@
   }
 
   function updateWait() {
+    if (isLive()) { el.badgeWait.hidden = true; return; }
     /* Laeuft es schon, oder liegt laengst ein anderes Video an, ist das
        Warten vorbei. Der Stand des Taktgebers gehoert dabei erst dann hierher,
        wenn er sich auf das neue Video bezieht - sonst zaehlt noch das
@@ -952,6 +1177,7 @@
   }
 
   function syncTick() {
+    if (isLive()) return;
     resumeTick();
     if (isMaster()) { tellSettled(); return; }
     if (!surface.settled) return;
@@ -1165,8 +1391,9 @@
   }
 
   function renderPeerTicks() {
-    var len = surface.length || 0;
     var row = el.scrubPeers;
+    if (isLive()) { row.innerHTML = ""; return; }
+    var len = surface.length || 0;
     if (!len) { row.innerHTML = ""; return; }
 
     /* Marken nur fuer die anderen, meine Position zeigt der Regler selbst. */
@@ -1188,11 +1415,18 @@
   function renderViewers() {
     var rows = "";
     var withGo = goMode();
+    var live = isLive();
     S.peers.forEach(function (p) {
       var cls = p.id === S.masterId ? "is-master" : "";
       /* Im Bereit-Modus traegt jede Zeile ihre Farbe: gruen heisst bereit,
-         rot heisst, der Raum wartet beim naechsten Wechsel auf sie. */
+         rot heisst, der Raum wartet beim naechsten Wechsel auf sie. Waehrend
+         eines Livestreams gibt es keine Position mehr, dafuer ein Punkt: ob
+         die Verbindung zum SFU steht. */
       if (withGo) cls += (cls ? " " : "") + (p.go ? "is-go" : "is-nogo");
+      var posCell = live
+        ? '<span class="v-dot ' + (p.connected ? "v-dot-on" : "v-dot-off") + '" title="' +
+            esc(t(p.connected ? "viewers.connected" : "viewers.pos")) + '"></span>'
+        : tc(peerTime(p));
       rows += '<tr class="' + cls + '">' +
         '<td><span class="v-who">' +
           '<span class="avatar" style="background:' + p.color + '">' + esc(initials(p.name)) + "</span>" +
@@ -1200,7 +1434,7 @@
           (p.isMe ? '<span class="v-you">' + esc(t("viewers.you")) + "</span>" : "") +
           '<span class="v-crown" title="' + esc(t("viewers.master")) + '">' + icon("i-crown") + "</span>" +
         "</span></td>" +
-        '<td class="v-pos">' + tc(peerTime(p)) + "</td>" +
+        '<td class="v-pos">' + posCell + "</td>" +
       "</tr>";
     });
     el.viewerRows.innerHTML = rows;
@@ -1208,6 +1442,7 @@
   }
 
   function updateViewerPositions() {
+    if (isLive()) return;
     var rows = el.viewerRows.rows;
     var base = masterTime();
     for (var i = 0; i < rows.length && i < S.peers.length; i++) {
@@ -1229,7 +1464,7 @@
      nichts mehr. Ausgeblendet waere schlechter - dann waere nicht zu sehen,
      dass es sie gibt und woran es liegt. Ein Druck sagt es. */
   function renderLocks() {
-    var locked = !mayControl();
+    var locked = !mayControl() || isLive();
     [el.btnPlay, el.btnBack10, el.btnFwd10, el.scrub].forEach(function (node) {
       node.classList.toggle("is-locked", locked);
       node.setAttribute("aria-disabled", locked ? "true" : "false");
@@ -1377,6 +1612,7 @@
     renderQueue();
     renderLog();
     renderGoUi();
+    renderLiveUi();
     if (!el.veilName.hidden) fillNameDialog(el.formName.dataset.mode === "change");
     if (S.jobs.length) { renderJobs(); paintUpload(); }
     /* Die Wortlisten haengen an der Sprache. */
@@ -1443,6 +1679,16 @@
   el.btnFwd10.addEventListener("click", function () { skip(SKIP); });
   el.btnBigPlay.addEventListener("click", function (e) {
     e.stopPropagation();
+    /* Waehrend eines Livestreams haengt am Knopf kein Video aus der
+       Warteschlange - surface.play() wuesste damit nichts anzufangen, wenn
+       gerade keins geladen ist. Also direkt an das Bildelement. */
+    if (isLive()) {
+      blocked = false;
+      var p = el.video.play();
+      if (p && p.catch) p.catch(function () { blocked = true; updatePlayUi(); });
+      updatePlayUi();
+      return;
+    }
     /* Beim Zuschauer steht der Knopf nur da, weil der Browser von allein
        nicht abspielen wollte. Dann holt er genau das nach - der Raum bleibt
        davon unberuehrt und der Abgleich zieht ihn gleich an die Stelle. */
@@ -1734,6 +1980,8 @@
 
   global.addEventListener("beforeunload", function () {
     if (S.conn) S.conn.close();
+    if (liveSession) liveSession.close();
+    if (liveStream) liveStream.getTracks().forEach(function (tr) { tr.stop(); });
   });
 
   /* ---------------------------------------------------------------- Name */
@@ -1917,6 +2165,11 @@
     renderQueue();
     applyNow(S.nowId);
     surface.start();
+    renderLiveUi();
+    /* Laeuft der Raum schon mit einer Uebertragung, wenn ich dazukomme (oder
+       neu verbinde), schaue ich einfach mit zu - senden kann ohnehin nur
+       der, der gerade den Takt vorgibt. */
+    if (S.live.on && S.live.byId !== S.me.id) startWatching();
 
     if (first) toast(t("toast.inRoom", { room: S.room }), "i-check");
   }

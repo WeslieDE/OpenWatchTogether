@@ -42,6 +42,8 @@
       "name.err.taken":    "Der Name ist im Raum schon vergeben.",
 
       "top.add":      "Video hinzufügen",
+      "top.live":     "Livestream starten",
+      "top.liveStop": "Livestream beenden",
       "top.theme":    "Ansicht wechseln",
       "top.rename":   "Namen ändern",
       "top.copy":     "Link kopieren",
@@ -69,6 +71,7 @@
       "stage.wait":        "Warte auf alle · {n}/{total} bereit",
       "stage.go.on":       "Bereit",
       "stage.go.off":      "Bereit?",
+      "stage.live":        "Live",
 
       "ctl.play":   "Abspielen",
       "ctl.pause":  "Pause",
@@ -87,11 +90,12 @@
       "now.go.on":    "Bereit",
       "now.go.off":   "Nicht bereit",
 
-      "viewers.title":  "Zuschauer",
-      "viewers.name":   "Name",
-      "viewers.pos":    "Position",
-      "viewers.you":    "du",
-      "viewers.master": "gibt den Takt vor",
+      "viewers.title":     "Zuschauer",
+      "viewers.name":      "Name",
+      "viewers.pos":       "Position",
+      "viewers.connected": "Verbunden",
+      "viewers.you":       "du",
+      "viewers.master":    "gibt den Takt vor",
 
       "queue.title":  "Warteschlange",
       "queue.now":    "läuft",
@@ -161,6 +165,10 @@
       "toast.settings":      "{name} hat die Raumeinstellungen geändert",
       "toast.badVideo":      "„{name}“ ist kein abspielbares Video und wurde wieder entfernt.",
       "toast.failed":        "Das hat nicht geklappt.",
+      "toast.liveStarted":   "{name} überträgt jetzt den Bildschirm",
+      "toast.liveStopped":   "Die Bildschirmübertragung ist vorbei",
+      "toast.liveDenied":    "Nur der Taktgeber kann einen Livestream starten.",
+      "toast.liveFailed":    "Die Bildschirmfreigabe wurde nicht erteilt.",
 
       "link.title":     "Gleich geht es los",
       "link.wait":      "Der Raum wird geöffnet.",
@@ -195,6 +203,8 @@
       "name.err.taken":    "That name is already taken in this room.",
 
       "top.add":      "Add video",
+      "top.live":     "Start livestream",
+      "top.liveStop": "Stop livestream",
       "top.theme":    "Switch appearance",
       "top.rename":   "Change name",
       "top.copy":     "Copy link",
@@ -222,6 +232,7 @@
       "stage.wait":        "Waiting for everyone · {n}/{total} ready",
       "stage.go.on":       "Ready",
       "stage.go.off":      "Ready?",
+      "stage.live":        "Live",
 
       "ctl.play":   "Play",
       "ctl.pause":  "Pause",
@@ -240,11 +251,12 @@
       "now.go.on":    "Ready",
       "now.go.off":   "Not ready",
 
-      "viewers.title":  "Viewers",
-      "viewers.name":   "Name",
-      "viewers.pos":    "Position",
-      "viewers.you":    "you",
-      "viewers.master": "sets the pace",
+      "viewers.title":     "Viewers",
+      "viewers.name":      "Name",
+      "viewers.pos":       "Position",
+      "viewers.connected": "Connected",
+      "viewers.you":       "you",
+      "viewers.master":    "sets the pace",
 
       "queue.title":  "Up next",
       "queue.now":    "playing",
@@ -314,6 +326,10 @@
       "toast.settings":      "{name} changed the room settings",
       "toast.badVideo":      "“{name}” is not a playable video and was removed again.",
       "toast.failed":        "That did not work.",
+      "toast.liveStarted":   "{name} is now sharing their screen",
+      "toast.liveStopped":   "The livestream has ended",
+      "toast.liveDenied":    "Only the pace-setter can start a livestream.",
+      "toast.liveFailed":    "Screen sharing was not allowed.",
 
       "link.title":     "Almost there",
       "link.wait":      "Opening the room.",

@@ -70,6 +70,16 @@ jumps and the timeline greyed out; pressing them says what's missing instead of
 stopping the film for the whole room. One click on **Take control** and they're
 yours.
 
+### 🖥️ Share your screen, live
+Whoever holds the controls can start a livestream instead of playing a video —
+their screen (and, if they allow it, its audio) goes out to everyone in the
+room over WebRTC, no dedicated TURN server required. Playback controls grey
+out while it runs since there's nothing to pause or seek in a live picture,
+and the viewer list swaps everyone's position for a green or red dot showing
+whether their stream connection is up. Drops and reconnects on its own if the
+connection hiccups. See [Screen sharing](docs/livestream.md) for how it's
+built.
+
 ### ✅ Ready when everyone is (optional)
 Switch the ready check on and a video change works like a lobby in a game: a
 striped overlay lies over the picture with one big button in the middle, red
