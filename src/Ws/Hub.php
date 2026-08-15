@@ -247,6 +247,7 @@ final class Hub
                     break;
                 }
                 $room->peers[$id]['name'] = $name;
+                $room->peers[$id]['color'] = Room::colorFor($name);
                 foreach ($room->uploads as $uid => $upload) {
                     if ($upload['byId'] === $id) {
                         $room->uploads[$uid]['by'] = $name;
@@ -254,7 +255,9 @@ final class Hub
                 }
                 /* Auch schon abgelegte Videos tragen den neuen Namen. */
                 Db::of($slug)->rename($id, $name);
-                $this->broadcast($room, 'named', ['id' => $id, 'name' => $name]);
+                $this->broadcast($room, 'named', [
+                    'id' => $id, 'name' => $name, 'color' => $room->peers[$id]['color'],
+                ]);
                 break;
 
             /* Laufende Uebertragung. Der Server merkt sich den Stand, damit ihn

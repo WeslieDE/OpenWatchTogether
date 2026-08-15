@@ -331,7 +331,11 @@
 
       case "named":
         var np = peerById(d.id);
-        if (np) np.name = d.name;
+        if (np) { np.name = d.name; np.color = d.color; }
+        if (d.id === S.me.id) {
+          S.me.color = d.color;
+          el.meAvatar.style.background = d.color;
+        }
         S.queue.forEach(function (item) {
           if (item.addedById === d.id) item.addedBy = d.name;
         });

@@ -38,8 +38,6 @@ final class Room
     public bool $live = false;
     public ?string $liveBy = null;
 
-    private int $colors = 0;
-
     public function __construct(string $slug)
     {
         $this->slug = $slug;
@@ -50,10 +48,11 @@ final class Room
 
     public function add(string $id, string $name, $conn): array
     {
+        $name = $this->freeName($name);
         $peer = [
             'id'    => $id,
-            'name'  => $this->freeName($name),
-            'color' => self::PALETTE[$this->colors++ % \count(self::PALETTE)],
+            'name'  => $name,
+            'color' => self::colorFor($name),
             'conn'  => $conn,
             'pos'   => 0.0,
             /* Welches Video dieser Teilnehmer geladen hat. Null heisst: noch
@@ -102,6 +101,13 @@ final class Room
     public function empty(): bool
     {
         return $this->order === [];
+    }
+
+    /** Immer dieselbe Palettenfarbe fuer denselben Namen. */
+    public static function colorFor(string $name): string
+    {
+        $hash = \crc32($name);
+        return self::PALETTE[$hash % \count(self::PALETTE)];
     }
 
     /** Name doppelt? Dann bekommt er eine Ziffer dazu. */
