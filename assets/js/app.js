@@ -567,6 +567,13 @@
     loadItem(item);
   }
 
+  /* Die Steuerleiste blasst nur aus, wenn es wirklich nichts zu bedienen
+     gibt - waehrend eines Livestreams gilt das Bild vom Sender genauso als
+     Inhalt wie ein Video aus der Warteschlange. */
+  function updateControlsIdle() {
+    el.controls.dataset.idle = (S.current || isLive()) ? "" : "1";
+  }
+
   function loadItem(item) {
     /* Ein Wechsel geht auf das Konto des Taktgebers: entweder hat er gerade
        umgeschaltet, oder ich selbst habe den Takt dafuer uebernommen. Der
@@ -612,7 +619,7 @@
       el.stageEmpty.hidden = false;
       el.stageTap.hidden = true;
       el.stageStart.hidden = true;
-      el.controls.dataset.idle = "1";
+      updateControlsIdle();
       el.nowTitle.textContent = t("now.empty");
       el.nowBy.textContent = "";
       el.tCur.textContent = "0:00";
@@ -637,7 +644,7 @@
     surface.muted = el.btnMute.classList.contains("is-muted");
     el.stageEmpty.hidden = true;
     el.stageTap.hidden = false;
-    el.controls.dataset.idle = "";
+    updateControlsIdle();
     el.nowTitle.textContent = item.title;
     el.nowBy.textContent = byLine(item, "now.by");
     el.tDur.textContent = tc(item.duration || 0);
@@ -802,6 +809,7 @@
     if (label) label.textContent = t(live ? "top.liveStop" : "top.live");
     el.badgeLive.hidden = !live;
     if (el.viewerPosHead) el.viewerPosHead.textContent = t(live ? "viewers.connected" : "viewers.pos");
+    updateControlsIdle();
     renderLocks();
     updatePlayUi();
   }
