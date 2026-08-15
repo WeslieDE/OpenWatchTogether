@@ -810,7 +810,7 @@
     el.badgeLive.hidden = !live;
     if (el.viewerPosHead) el.viewerPosHead.textContent = t(live ? "viewers.connected" : "viewers.pos");
     updateControlsIdle();
-    renderLocks();
+    renderTakeover();
     updatePlayUi();
   }
 
@@ -1470,7 +1470,7 @@
   }
 
   function renderTakeover() {
-    el.btnTakeover.hidden = !(surface.ready && !isMaster());
+    el.btnTakeover.hidden = !((surface.ready || isLive()) && !isMaster());
     renderLocks();
     renderGoUi();
   }
