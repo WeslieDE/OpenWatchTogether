@@ -211,6 +211,11 @@ async function onMessage(room, conn, raw) {
           enableUdp: true,
           enableTcp: true,
           preferUdp: true,
+          /* Ohne einen realistischen Startwert tastet sich die Bandbreiten-
+             schaetzung sehr vorsichtig heran und braucht spuerbar, bis ein
+             frisch verbundener Zuschauer die passende Qualitaetsstufe
+             bekommt. */
+          initialAvailableOutgoingBitrate: 1000000,
         });
         transport.on('dtlsstatechange', (state) => {
           if (state === 'closed' || state === 'failed') transport.close();

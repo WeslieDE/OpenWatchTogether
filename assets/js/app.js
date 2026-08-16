@@ -824,7 +824,15 @@
   function startBroadcast() {
     if (!isMaster() || isLive() || !global.navigator.mediaDevices || !global.navigator.mediaDevices.getDisplayMedia) return;
 
-    global.navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).then(function (stream) {
+    /* Ohne Deckel liefert der Browser oft die volle Bildschirmaufloesung mit
+       hoher Bildrate - bei 4K- oder Mehrschirm-Aufbauten weit mehr, als eine
+       gewoehnliche Leitung tragen kann. Das allein macht das Bild schon
+       ruckelig, noch bevor irgendein Zuschauer mit knapper Bandbreite dazu-
+       kommt. */
+    global.navigator.mediaDevices.getDisplayMedia({
+      video: { width: { ideal: 1920, max: 2560 }, height: { ideal: 1080, max: 1440 }, frameRate: { ideal: 30, max: 30 } },
+      audio: true
+    }).then(function (stream) {
       liveStream = stream;
 
       /* Das eigene Bild steht sofort, unabhaengig davon, ob die
@@ -849,6 +857,12 @@
       });
 
       stream.getVideoTracks().forEach(function (track) {
+        /* Ohne diesen Hinweis geht der Browser bei einer Bildschirm-
+           aufnahme von sich aus davon aus, dass Schaerfe wichtiger ist als
+           Bildrate, und opfert bei knapper Bandbreite lieber die Bildrate -
+           im Zweifel bis fast zum Standbild. Genau umgekehrt soll es aber
+           sein: lieber ruckelfrei bei etwas weniger Schaerfe. */
+        track.contentHint = "motion";
         /* Der Browser-eigene "Freigabe beenden"-Knopf zaehlt wie ein Druck
            auf unseren. */
         track.addEventListener("ended", function () { if (isLive()) stopBroadcast(); });

@@ -31,6 +31,18 @@
   var RETRY_MIN = 1000;
   var RETRY_MAX = 15000;
 
+  /* Drei Qualitaetsstufen fuer das Bild, gestaffelt in Aufloesung und
+     Bitrate. mediasoup waehlt fuer jeden Zuschauer selbst und laufend die
+     passende Stufe, je nachdem, was seine Leitung gerade traegt - wer knapp
+     dran ist, bekommt ein kleineres, aber fluessiges Bild statt eines
+     ruckelnden grossen. Der Ton bleibt unangetastet, er kostet ohnehin
+     kaum etwas. */
+  var VIDEO_ENCODINGS = [
+    { scaleResolutionDownBy: 4, maxBitrate: 200000,  maxFramerate: 15 },
+    { scaleResolutionDownBy: 2, maxBitrate: 700000,  maxFramerate: 24 },
+    { scaleResolutionDownBy: 1, maxBitrate: 2500000, maxFramerate: 30 },
+  ];
+
   function endpoint(room, peer, role, token) {
     var cfg = WT.api.settings().sfu || {};
     var base = cfg.url;
@@ -253,7 +265,12 @@
     /* Bild und Ton (falls vorhanden) nacheinander, jeweils die Bestaetigung
        des Servers abwarten - dann braucht es keine eigene Zuordnung. */
     function produceTrack(track) {
-      return sendTransport.produce({ track: track }).then(function () {
+      var opts = { track: track };
+      if (track.kind === "video") {
+        opts.encodings = VIDEO_ENCODINGS;
+        opts.codecOptions = { videoGoogleStartBitrate: 1000 };
+      }
+      return sendTransport.produce(opts).then(function () {
         return ch.once("produced");
       });
     }

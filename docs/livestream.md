@@ -92,3 +92,32 @@ docker run --rm -p 8080:80 -p 42000:42000/udp -p 42000:42000/tcp \
 
 While a stream is live, playback controls (play/pause/seek) are disabled for
 everyone, and positions are not synchronised or broadcast at all.
+
+## Video quality and bandwidth
+
+The stream is a single WebRTC producer forwarded to every viewer — without
+any adaptation, all viewers would be stuck with whatever quality the
+weakest connection in the room could handle, and a raw, uncapped
+`getDisplayMedia()` capture (native resolution and refresh rate, easily 4K
+at 60fps on a modern screen) needs far more bandwidth than one usually has
+free.
+
+- **Capture is capped client-side**: `getDisplayMedia()` asks for at most
+  1920×1080 (up to 2560×1440) at up to 30fps, so a big or high-refresh
+  screen doesn't inflate the source bitrate for no visual benefit on a
+  shared video.
+- **Simulcast**: the video producer sends three encodings at once (roughly
+  quarter/half/full size, capped at 200/700/2500 kbps) — see
+  `VIDEO_ENCODINGS` in `assets/js/webrtc.js`. mediasoup picks and continuously
+  adjusts, *per viewer*, whichever layer that viewer's own downlink can
+  currently sustain, so one struggling connection no longer drags the
+  picture down (or drops frames) for everyone else. This needs no explicit
+  client-side logic — mediasoup's built-in bandwidth estimation on each
+  viewer's WebRTC transport drives it automatically.
+- **`initialAvailableOutgoingBitrate`** on each `WebRtcTransport`
+  (`sfu/server.js`) gives that estimation a realistic starting point
+  (1 Mbps) instead of ramping up from a very conservative default, so a
+  freshly connected viewer reaches good quality sooner.
+
+Audio is left as a single, unscaled Opus stream — it costs little enough
+that adapting it isn't worth the complexity.
