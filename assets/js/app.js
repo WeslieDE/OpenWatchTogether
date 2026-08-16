@@ -1470,7 +1470,7 @@
   }
 
   function renderTakeover() {
-    el.btnTakeover.hidden = !((surface.ready || isLive()) && !isMaster());
+    el.btnTakeover.hidden = isMaster();
     renderLocks();
     renderGoUi();
   }
