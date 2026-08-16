@@ -217,11 +217,20 @@ git clone https://github.com/WeslieDE/OpenWatchTogether.git
 cd OpenWatchTogether
 
 docker build -t watch-together .
-docker run --rm -p 8080:80 watch-together
+docker run --rm -p 8080:80 \
+  -p 42000:42000/tcp \
+  -p 42000:42000/udp \
+  -e WT_SFU_ANNOUNCED_IP=your.server.ip \
+  watch-together
 ```
 
 Open <http://localhost:8080>, pick a room name, pick your name — done. Send the
 URL from your address bar to whoever should join.
+
+The extra `42000` port and `WT_SFU_ANNOUNCED_IP` are for screen sharing — set
+the variable to your server's public IP (or `127.0.0.1` when just trying it out
+on your own machine). Without it, everything else works fine, only the
+livestream feature won't connect for anyone outside your machine.
 
 > 📖 **[Full setup guide →](docs/SETUP.md)**
 > Docker Compose, reverse proxy & HTTPS, manual PHP installation, every

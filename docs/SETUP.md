@@ -52,19 +52,27 @@ git clone https://github.com/WeslieDE/OpenWatchTogether.git
 cd OpenWatchTogether
 
 docker build -t watch-together .
-docker run --rm -p 8080:80 watch-together
+docker run --rm -p 8080:80 \
+  -p 42000:42000/tcp \
+  -p 42000:42000/udp \
+  -e WT_SFU_ANNOUNCED_IP=your.server.ip \
+  watch-together
 ```
 
 Open <http://localhost:8080>, pick a room name, pick your name — done. Send the
 URL from your address bar to whoever should join.
 
-Use a different port by changing the left half of `-p`, e.g. `-p 9000:80` for
-<http://localhost:9000>.
+Use a different port by changing the left half of the first `-p`, e.g.
+`-p 9000:80` for <http://localhost:9000>.
 
-> **Screen sharing needs one more port.** The room master can share their
-> screen over WebRTC — see [Screen sharing (livestream)](livestream.md) for
-> the extra port (`-p 42000:42000/udp -p 42000:42000/tcp` by default) and the
-> `WT_SFU_ANNOUNCED_IP` variable it needs pointed at your public IP.
+> **Screen sharing needs the extra port and IP above.** The room master can
+> share their screen over WebRTC — see
+> [Screen sharing (livestream)](livestream.md) for what `WT_SFU_PORT`
+> (`42000` by default) and `WT_SFU_ANNOUNCED_IP` do. Set
+> `WT_SFU_ANNOUNCED_IP` to your server's public IP or hostname; use
+> `127.0.0.1` when you're just trying the container out on your own machine.
+> Leaving both out entirely still works — only screen sharing then won't
+> connect for anyone outside your machine.
 
 > **No volume needed — on purpose.**
 > Watch Together is designed to be disposable. Rooms and videos live as long as
@@ -89,9 +97,12 @@ services:
     container_name: watch-together
     ports:
       - "8080:80"
+      - "42000:42000/tcp"   # screen sharing (WebRTC media)
+      - "42000:42000/udp"   # screen sharing (WebRTC media)
+    environment:
+      WT_SFU_ANNOUNCED_IP: your.server.ip   # public IP/hostname for screen sharing
     restart: unless-stopped
-    # Optional — every setting has a sensible default:
-    # environment:
+    # Further optional settings, every one has a sensible default:
     #   WT_MAX_BYTES: "0"        # 0 = no upload size limit
 ```
 
