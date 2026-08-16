@@ -14,7 +14,7 @@ Pause it, come back tomorrow, and it picks up exactly where you left off.
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Code: AI-generated](https://img.shields.io/badge/code-AI--generated-8a5cf6)](#-what-is-this)
 
-<img src="docs/player%20(style%20dark).jpg" alt="A Watch Together room: player, viewer list and shared queue" width="900">
+<img src="docs/screenshot-player-dark.jpg" alt="A Watch Together room: player, viewer list and shared queue" width="900">
 
 </div>
 
@@ -73,12 +73,18 @@ yours.
 ### 🖥️ Share your screen, live
 Whoever holds the controls can start a livestream instead of playing a video —
 their screen (and, if they allow it, its audio) goes out to everyone in the
-room over WebRTC, no dedicated TURN server required. Playback controls grey
-out while it runs since there's nothing to pause or seek in a live picture,
-and the viewer list swaps everyone's position for a green or red dot showing
-whether their stream connection is up. Drops and reconnects on its own if the
-connection hiccups. See [Screen sharing](docs/livestream.md) for how it's
-built.
+room over WebRTC, no dedicated TURN server required. A **Live** badge appears
+on the picture, the viewer list swaps everyone's position for a green or red
+dot showing whether their stream connection is up, and playback controls grey
+out since there's nothing to pause or seek in a live picture. Drops and
+reconnects on its own if the connection hiccups.
+
+<p align="center">
+  <img src="docs/screenshot-live-master.jpg" alt="Screen sharing seen by the person presenting" width="48%">
+  <img src="docs/screenshot-live-viewer.jpg" alt="Screen sharing seen by a viewer, with a green connection dot" width="48%">
+</p>
+
+See [Screen sharing](docs/livestream.md) for how it's built.
 
 ### ✅ Ready when everyone is (optional)
 Switch the ready check on and a video change works like a lobby in a game: a
@@ -162,9 +168,16 @@ so it only ever shows what happened while you were there.
 Everything is synced except the sound. Turn it down, mute it, crank it up — it
 only affects you, and your browser remembers it for next time.
 
-### 🌗 Light & dark, English & German
-The interface follows your system theme and your browser language out of the box,
-and you can override either. Your choices are remembered locally.
+### 🌗 Light, dim or dark — and your language
+One click on the theme icon cycles through three looks: bright **light**, a
+soft **dim** grey for evenings when full dark feels like too much, and true
+**dark** for movie-night black. The interface also follows your system theme
+and your browser language out of the box, and you can override either. Your
+choices are remembered locally.
+
+<p align="center">
+  <img src="docs/screenshot-theme-stages.png" alt="The three theme stages: light, dim and dark" width="700">
+</p>
 
 ### 🍓 Names, without the thinking
 Can't come up with a room name? The app suggests some. Rooms get everyday objects
@@ -176,16 +189,16 @@ Can't come up with a room name? The app suggests some. Rooms get everyday object
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/player%20(style%20dark).jpg" alt="Player in dark mode"></td>
-    <td width="50%"><img src="docs/player%20(style%20lite).jpg" alt="Player in light mode"></td>
+    <td width="50%"><img src="docs/screenshot-player-dark.jpg" alt="Player in dark mode"></td>
+    <td width="50%"><img src="docs/screenshot-player-light.jpg" alt="Player in light mode"></td>
   </tr>
   <tr>
     <td align="center"><b>Dark mode</b></td>
     <td align="center"><b>Light mode</b></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/input-room-name%20(style%20dark).png" alt="Joining a room in dark mode"></td>
-    <td width="50%"><img src="docs/input-room-name%20(style%20lite).png" alt="Joining a room in light mode"></td>
+    <td width="50%"><img src="docs/screenshot-join-dark.png" alt="Joining a room in dark mode"></td>
+    <td width="50%"><img src="docs/screenshot-join-light.png" alt="Joining a room in light mode"></td>
   </tr>
   <tr>
     <td align="center" colspan="2"><b>Joining a room — a name is all it takes</b></td>
