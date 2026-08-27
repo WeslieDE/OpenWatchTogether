@@ -102,12 +102,11 @@ weakest connection in the room could handle, and a raw, uncapped
 at 60fps on a modern screen) needs far more bandwidth than one usually has
 free.
 
-- **Capture is capped client-side**: `getDisplayMedia()` asks for at most
-  1920×1080 (up to 2560×1440) at up to 30fps, so a big or high-refresh
-  screen doesn't inflate the source bitrate for no visual benefit on a
-  shared video.
-- **Simulcast**: the video producer sends three encodings at once (roughly
-  quarter/half/full size, capped at 200/700/2500 kbps) — see
+- **Capture is capped client-side**: `getDisplayMedia()` asks for exactly
+  1920×1080 at 25fps, so a big or high-refresh screen doesn't inflate the
+  source bitrate for no visual benefit on a shared video.
+- **Simulcast**: the video producer sends three encodings at once — 360p,
+  720p and 1080p (capped at 1000/2500/5000 kbps) — see
   `VIDEO_ENCODINGS` in `assets/js/webrtc.js`. mediasoup picks and continuously
   adjusts, *per viewer*, whichever layer that viewer's own downlink can
   currently sustain, so one struggling connection no longer drags the
@@ -116,8 +115,17 @@ free.
   viewer's WebRTC transport drives it automatically.
 - **`initialAvailableOutgoingBitrate`** on each `WebRtcTransport`
   (`sfu/server.js`) gives that estimation a realistic starting point
-  (1 Mbps) instead of ramping up from a very conservative default, so a
-  freshly connected viewer reaches good quality sooner.
+  (5 Mbps, matching the top simulcast layer) instead of ramping up from a
+  very conservative default, so a freshly connected viewer reaches good
+  quality sooner.
+- **Degradation preference**: the captured track gets `contentHint =
+  "motion"` (`assets/js/app.js`) so the encoder doesn't default to
+  sacrificing framerate first under pressure. Left alone that would let it
+  sacrifice *resolution* almost without limit instead — smooth but mushy.
+  `assets/js/webrtc.js` overrides this back to `degradationPreference =
+  "balanced"` on the underlying `RTCRtpSender` right after producing, so
+  resolution and framerate are traded off against each other rather than
+  either one being sacrificed outright.
 
 Audio is left as a single, unscaled Opus stream — it costs little enough
 that adapting it isn't worth the complexity.

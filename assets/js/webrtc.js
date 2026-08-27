@@ -38,9 +38,9 @@
      ruckelnden grossen. Der Ton bleibt unangetastet, er kostet ohnehin
      kaum etwas. */
   var VIDEO_ENCODINGS = [
-    { scaleResolutionDownBy: 4, maxBitrate: 200000,  maxFramerate: 15 },
-    { scaleResolutionDownBy: 2, maxBitrate: 700000,  maxFramerate: 24 },
-    { scaleResolutionDownBy: 1, maxBitrate: 2500000, maxFramerate: 30 },
+    { scaleResolutionDownBy: 3,   maxBitrate: 1000000, maxFramerate: 15 },
+    { scaleResolutionDownBy: 1.5, maxBitrate: 2500000, maxFramerate: 20 },
+    { scaleResolutionDownBy: 1,   maxBitrate: 5000000, maxFramerate: 25 },
   ];
 
   function endpoint(room, peer, role, token) {
@@ -247,6 +247,18 @@
    * state: "connecting" | "open" | "back" | "lost"
    * Rueckgabe: { close() }
    */
+  /* Drei Stufen, wie der Encoder bei knapper Leitung oder CPU-Last
+     zwischen Schaerfe und Fluessigkeit abwaegt - der Sender darf das per
+     Dropdown live umschalten (siehe app.js). "motion" opfert die
+     Aufloesung fast beliebig fuer eine ruckelfreie Bildrate, "text" macht
+     es umgekehrt (fuer Text- oder Code-lastige Inhalte), "balanced" wiegt
+     beides gegeneinander ab statt eine Seite komplett preiszugeben. */
+  var QUALITY_PRESETS = {
+    motion:   { contentHint: "motion", degradationPreference: "maintain-framerate" },
+    balanced: { contentHint: "motion", degradationPreference: "balanced" },
+    text:     { contentHint: "text",   degradationPreference: "maintain-resolution" }
+  };
+
   function broadcast(opts) {
     var closed = false;
     var wait = RETRY_MIN;
@@ -254,6 +266,9 @@
     var everOpen = false;
     var ch = null;
     var sendTransport = null;
+    var videoTrack = null;
+    var videoProducer = null;
+    var quality = QUALITY_PRESETS[opts.quality] ? opts.quality : "balanced";
 
     function scheduleRetry() {
       if (closed || timer) return;
@@ -262,15 +277,35 @@
       wait = Math.min(RETRY_MAX, Math.round(wait * 1.8));
     }
 
+    /* Wirkt sofort auf die laufende Uebertragung, ganz ohne Neuverbindung -
+       der Track bleibt derselbe, nur sein contentHint und die
+       degradationPreference des aktuellen Producers aendern sich. Nach
+       einem Wiederaufbau (neuer Producer) wird beim naechsten produceTrack
+       erneut angewendet, siehe dort. */
+    function applyQuality() {
+      var preset = QUALITY_PRESETS[quality];
+      if (videoTrack) videoTrack.contentHint = preset.contentHint;
+      var sender = videoProducer && videoProducer.rtpSender;
+      if (!sender || !sender.getParameters || !sender.setParameters) return;
+      var params = sender.getParameters();
+      params.degradationPreference = preset.degradationPreference;
+      sender.setParameters(params).catch(function () { /* zu spaet gesetzt, dann bleibt es beim Default */ });
+    }
+
     /* Bild und Ton (falls vorhanden) nacheinander, jeweils die Bestaetigung
        des Servers abwarten - dann braucht es keine eigene Zuordnung. */
     function produceTrack(track) {
       var opts = { track: track };
       if (track.kind === "video") {
         opts.encodings = VIDEO_ENCODINGS;
-        opts.codecOptions = { videoGoogleStartBitrate: 1000 };
+        opts.codecOptions = { videoGoogleStartBitrate: 3000 };
       }
-      return sendTransport.produce(opts).then(function () {
+      return sendTransport.produce(opts).then(function (producer) {
+        if (track.kind === "video") {
+          videoTrack = track;
+          videoProducer = producer;
+          applyQuality();
+        }
         return ch.once("produced");
       });
     }
@@ -344,6 +379,11 @@
         sendTransport = null;
         if (ch) ch.close();
         ch = null;
+      },
+      setQuality: function (mode) {
+        if (!QUALITY_PRESETS[mode]) return;
+        quality = mode;
+        applyQuality();
       }
     };
   }

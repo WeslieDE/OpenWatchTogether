@@ -59,7 +59,7 @@ const MEDIA_CODECS = [
   { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },
   {
     kind: 'video', mimeType: 'video/VP8', clockRate: 90000,
-    parameters: { 'x-google-start-bitrate': 1000 },
+    parameters: { 'x-google-start-bitrate': 3000 },
   },
 ];
 
@@ -232,7 +232,7 @@ async function onMessage(room, conn, raw) {
              schaetzung sehr vorsichtig heran und braucht spuerbar, bis ein
              frisch verbundener Zuschauer die passende Qualitaetsstufe
              bekommt. */
-          initialAvailableOutgoingBitrate: 1000000,
+          initialAvailableOutgoingBitrate: 5000000,
         });
         transport.on('dtlsstatechange', (state) => {
           if (state === 'closed' || state === 'failed') transport.close();

@@ -315,9 +315,16 @@
           <span data-i18n="link.lost"></span>
         </div>
 
-        <div class="stage-badge stage-badge-live" id="badgeLive" hidden>
-          <span class="pulse" aria-hidden="true"></span>
-          <span data-i18n="stage.live"></span>
+        <div class="stage-badges">
+          <div class="stage-badge stage-badge-live" id="badgeLive" hidden>
+            <span class="pulse" aria-hidden="true"></span>
+            <span data-i18n="stage.live"></span>
+          </div>
+          <!-- Nur fuer den Sender: zeigt, welche der drei Qualitaetsstufen
+               (Dropdown in .now-actions) gerade aktiv ist. -->
+          <div class="stage-badge stage-badge-quality" id="badgeQuality" hidden>
+            <span id="badgeQualityText"></span>
+          </div>
         </div>
 
         <div class="stage-start" id="stageStart" hidden>
@@ -397,6 +404,13 @@
           <button class="btn btn-sm btn-go" id="btnGo" type="button" hidden>
             <svg><use href="#i-check"/></svg><span id="btnGoText"></span>
           </button>
+          <!-- Nur fuer den Sender waehrend der Uebertragung: wie der Encoder
+               zwischen Schaerfe und Fluessigkeit abwaegt, siehe webrtc.js. -->
+          <select class="select-quality" id="selQuality" hidden data-i18n-attr="aria-label:quality.label">
+            <option value="motion" data-i18n="quality.motion"></option>
+            <option value="balanced" data-i18n="quality.balanced"></option>
+            <option value="text" data-i18n="quality.text"></option>
+          </select>
           <button class="btn btn-soft btn-sm" id="btnTakeover" hidden>
             <svg><use href="#i-crown"/></svg><span data-i18n="now.takeover"></span>
           </button>

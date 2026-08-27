@@ -90,6 +90,11 @@
       "now.go.on":    "Bereit",
       "now.go.off":   "Nicht bereit",
 
+      "quality.label":    "Bildqualität",
+      "quality.motion":   "Bewegung",
+      "quality.balanced": "Ausgewogen",
+      "quality.text":     "Text",
+
       "viewers.title":     "Zuschauer",
       "viewers.name":      "Name",
       "viewers.pos":       "Position",
@@ -252,6 +257,11 @@
       "now.takeover": "Take control",
       "now.go.on":    "Ready",
       "now.go.off":   "Not ready",
+
+      "quality.label":    "Video quality",
+      "quality.motion":   "Motion",
+      "quality.balanced": "Balanced",
+      "quality.text":     "Text",
 
       "viewers.title":     "Viewers",
       "viewers.name":      "Name",

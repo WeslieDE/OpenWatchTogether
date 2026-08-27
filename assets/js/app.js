@@ -35,6 +35,7 @@
   var STORE_VOL   = "wt.volume";
   var STORE_MUTE  = "wt.muted";
   var STORE_WIDE  = "wt.wide";
+  var STORE_QUALITY = "wt.quality";
 
   var SYNC_OK   = 0.4;    /* darunter gilt alles als gleich */
   var SYNC_HARD = 20;     /* darueber wird hart gesprungen  */
@@ -122,6 +123,7 @@
     stageEmpty: $("stageEmpty"), stageTap: $("stageTap"), stageStart: $("stageStart"),
     btnBigPlay: $("btnBigPlay"), badgeSync: $("badgeSync"), badgeLink: $("badgeLink"),
     badgeWait: $("badgeWait"), badgeWaitText: $("badgeWaitText"), badgeLive: $("badgeLive"),
+    badgeQuality: $("badgeQuality"), badgeQualityText: $("badgeQualityText"),
     stageGo: $("stageGo"), btnGoBig: $("btnGoBig"), goBigText: $("goBigText"),
 
     controls: $("controls"), btnPlay: $("btnPlay"), tCur: $("tCur"), tDur: $("tDur"),
@@ -132,7 +134,7 @@
     btnWide: $("btnWide"), btnFull: $("btnFull"),
 
     now: $("now"), nowTitle: $("nowTitle"), nowBy: $("nowBy"), btnTakeover: $("btnTakeover"),
-    btnGo: $("btnGo"), btnGoText: $("btnGoText"),
+    btnGo: $("btnGo"), btnGoText: $("btnGoText"), selQuality: $("selQuality"),
 
     logRows: $("logRows"), logCount: $("logCount"),
 
@@ -800,6 +802,20 @@
   var liveTokenWaiter = null; /* wartet auf die Antwort von "live-start" */
   var livePausedAt = 0;       /* Stelle des Warteschlangen-Videos, falls eines lief */
 
+  var QUALITY_MODES = ["motion", "balanced", "text"];
+  /* Raumuebergreifend gemerkt (eigenes Geraet, kein Server-Zustand) - wer
+     einmal "text" fuer scharfe Folien gewaehlt hat, muss das nicht bei
+     jedem neuen Raum wiederholen. */
+  var liveQuality = QUALITY_MODES.indexOf(stored(STORE_QUALITY)) !== -1 ? stored(STORE_QUALITY) : "balanced";
+
+  function setLiveQuality(mode) {
+    if (QUALITY_MODES.indexOf(mode) === -1) return;
+    liveQuality = mode;
+    store(STORE_QUALITY, mode);
+    if (liveSession) liveSession.setQuality(mode);
+    renderLiveUi();
+  }
+
   function renderLiveUi() {
     var master = isMaster();
     var live = isLive();
@@ -808,6 +824,17 @@
     var label = el.btnLive.querySelector("span");
     if (label) label.textContent = t(live ? "top.liveStop" : "top.live");
     el.badgeLive.hidden = !live;
+
+    /* Die Qualitaetswahl betrifft nur den eigenen Encoder - sichtbar also
+       nur fuer den Sender, und nur waehrend tatsaechlich gesendet wird. */
+    var sending = master && live;
+    el.selQuality.hidden = !sending;
+    el.badgeQuality.hidden = !sending;
+    if (sending) {
+      el.selQuality.value = liveQuality;
+      el.badgeQualityText.textContent = t("quality." + liveQuality);
+    }
+
     if (el.viewerPosHead) el.viewerPosHead.textContent = t(live ? "viewers.connected" : "viewers.pos");
     updateControlsIdle();
     renderTakeover();
@@ -830,7 +857,7 @@
        ruckelig, noch bevor irgendein Zuschauer mit knapper Bandbreite dazu-
        kommt. */
     global.navigator.mediaDevices.getDisplayMedia({
-      video: { width: { ideal: 1920, max: 2560 }, height: { ideal: 1080, max: 1440 }, frameRate: { ideal: 30, max: 30 } },
+      video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 25, max: 25 } },
       audio: true
     }).then(function (stream) {
       liveStream = stream;
@@ -857,12 +884,6 @@
       });
 
       stream.getVideoTracks().forEach(function (track) {
-        /* Ohne diesen Hinweis geht der Browser bei einer Bildschirm-
-           aufnahme von sich aus davon aus, dass Schaerfe wichtiger ist als
-           Bildrate, und opfert bei knapper Bandbreite lieber die Bildrate -
-           im Zweifel bis fast zum Standbild. Genau umgekehrt soll es aber
-           sein: lieber ruckelfrei bei etwas weniger Schaerfe. */
-        track.contentHint = "motion";
         /* Der Browser-eigene "Freigabe beenden"-Knopf zaehlt wie ein Druck
            auf unseren. */
         track.addEventListener("ended", function () { if (isLive()) stopBroadcast(); });
@@ -873,7 +894,7 @@
 
       liveSession = webrtc.broadcast({
         room: S.room, peer: S.me.id, stream: stream,
-        getToken: requestLiveToken,
+        getToken: requestLiveToken, quality: liveQuality,
         onState: function (state) {
           send("live-status", { connected: state === "open" || state === "back" });
         }
@@ -1730,6 +1751,7 @@
     doPlay();
   });
   el.btnTakeover.addEventListener("click", function () { takeControl(false); });
+  el.selQuality.addEventListener("change", function () { setLiveQuality(el.selQuality.value); });
 
   /* Das Bild selbst steuert nichts. Zu leicht rutscht sonst jemand aus, und
      der ganze Raum steht. Ein Klick sagt nur, wo die Bedienung liegt, ein
