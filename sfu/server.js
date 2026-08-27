@@ -72,21 +72,38 @@ const rooms = new Map();
 
 let worker = null;
 let webRtcServer = null;
+let workerInit = null;
 
+/*
+ * Zwei Peers, die (z.B. direkt nach einem Neustart) fast gleichzeitig den
+ * ersten Raum anlegen, duerfen sich hier keine Race liefern: ohne dieses
+ * gemeinsame Promise wuerden beide "worker" noch als null sehen und je einen
+ * eigenen mediasoup-Worker samt WebRtcServer auf demselben Port erzeugen -
+ * der zweite scheitert am Bind, und "worker"/"webRtcServer" landen im
+ * schlimmsten Fall auf zwei verschiedenen Worker-Instanzen auseinander.
+ */
 async function ensureWorker() {
   if (worker) return;
-  worker = await mediasoup.createWorker({ logLevel: 'warn' });
-  worker.on('died', () => {
-    console.error('[sfu] mediasoup-Worker ist abgestuerzt, der Prozess beendet sich.');
-    process.exit(1);
-  });
+  if (!workerInit) {
+    workerInit = (async () => {
+      const w = await mediasoup.createWorker({ logLevel: 'warn' });
+      w.on('died', () => {
+        console.error('[sfu] mediasoup-Worker ist abgestuerzt, der Prozess beendet sich.');
+        process.exit(1);
+      });
 
-  webRtcServer = await worker.createWebRtcServer({
-    listenInfos: [
-      { protocol: 'udp', ip: LISTEN_IP, announcedIp: ANNOUNCED_IP, port: MEDIA_PORT },
-      { protocol: 'tcp', ip: LISTEN_IP, announcedIp: ANNOUNCED_IP, port: MEDIA_PORT },
-    ],
-  });
+      const server = await w.createWebRtcServer({
+        listenInfos: [
+          { protocol: 'udp', ip: LISTEN_IP, announcedIp: ANNOUNCED_IP, port: MEDIA_PORT },
+          { protocol: 'tcp', ip: LISTEN_IP, announcedIp: ANNOUNCED_IP, port: MEDIA_PORT },
+        ],
+      });
+
+      worker = w;
+      webRtcServer = server;
+    })();
+  }
+  await workerInit;
 }
 
 async function roomOf(slug) {
