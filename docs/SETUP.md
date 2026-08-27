@@ -324,15 +324,17 @@ What that means in practice:
 
 | Event | What happens |
 |---|---|
-| Service / container restarts | All rooms, videos, thumbnails and queues are deleted — except rooms that keep their videos |
+| Service / container restarts | All rooms, videos, thumbnails and queues are deleted — except rooms that keep their videos and haven't sat empty for more than 4 hours |
 | A video finishes playing | That file is removed from the server automatically, unless the room keeps its videos |
 | Someone removes a video from the queue | The file and its thumbnail are deleted |
-| A room sits empty for a while | Nothing — rooms and their videos stay until the restart |
+| A room sits empty for a while | Nothing, unless it keeps its videos — see below |
+| A kept room sits empty for more than 4 hours | It's deleted just like any other, no restart needed |
 | Six hours pass on an abandoned partial upload | The leftover chunks are cleaned up |
 
-There is **no expiry timer**. As long as the service keeps running, your room
-and its queue stay exactly as you left them — including the position of the video
-you paused, so you can pick it up again the next evening.
+Ordinary rooms have **no expiry timer**: as long as the service keeps running,
+your room and its queue stay exactly as you left them — including the position
+of the video you paused, so you can pick it up again the next evening. A kept
+room gets that same 4-hour grace period once it empties.
 
 ### The exception: a room that keeps its videos
 
@@ -341,7 +343,11 @@ In the room settings (the slider icon in the top bar) there is a switch called
 
 - a video that has run through stays in the queue instead of being deleted;
 - the room survives the startup wipe **as long as videos are actually left in
-  it**. An empty kept room is cleared like any other.
+  it and someone has dropped by within the last 4 hours**. "Keep" only
+  postpones deletion, it doesn't prevent it — a kept room that's been empty
+  longer than that is deleted like any other, and this is checked continuously
+  while the service runs, not only at restart (see `Cleanup::KEEP_TTL` in
+  `src/Cleanup.php`).
 
 Removing a video by hand still deletes it, and the setting itself lives in the
 room's own database, so it is remembered along with the queue.

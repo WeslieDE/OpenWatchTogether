@@ -137,8 +137,10 @@ Three things every room decides for itself, and everyone in it sees the change
 straight away.
 
 **Keep the videos.** Normally a video is deleted the moment it has run through.
-Turn that off and it simply stays in the queue — and as long as videos are left
-in a room, that room survives a restart of the service too.
+Turn that off and it simply stays in the queue — and that room survives a
+restart of the service too, as long as videos are left in it. This only
+postpones deletion, though: a kept room that sits empty for more than 4 hours
+is deleted anyway.
 
 **Ready check.** Off by default. Turn it on and a video change waits for the
 whole room, as described above.
@@ -244,7 +246,8 @@ livestream feature won't connect for anyone outside your machine.
 leaves no trace: no disk slowly filling up, no volume to mount, no backups to
 think about. As long as the service keeps running, your room stays exactly as you
 left it, including the spot you paused at. The one exception is a room you
-explicitly told to keep its videos.
+explicitly told to keep its videos — and even that only buys it 4 extra hours
+once it sits empty.
 → [Details](docs/SETUP.md#nothing-survives-a-restart--and-why-thats-good)
 
 **Formats:** anything the browser plays directly — MP4, WebM, OGG — uploads
