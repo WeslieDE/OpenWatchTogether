@@ -182,7 +182,10 @@
       "link.retry":     "Der Raum ist gerade nicht erreichbar. Es wird weiter versucht.",
       "link.lost":      "Verbindung unterbrochen",
       "toast.linkLost": "Die Verbindung ist weg. Es wird weiter versucht.",
-      "toast.linkBack": "Wieder verbunden"
+      "toast.linkBack": "Wieder verbunden",
+
+      "toast.deniedBadword": "Raum- oder Anzeigename enthält ein gesperrtes Wort. Bitte anders wählen.",
+      "toast.deniedRoom":    "Ungültiger Raumname."
     },
 
     en: {
@@ -350,7 +353,10 @@
       "link.retry":     "The room cannot be reached right now. Still trying.",
       "link.lost":      "Connection lost",
       "toast.linkLost": "The connection dropped. Still trying.",
-      "toast.linkBack": "Back online"
+      "toast.linkBack": "Back online",
+
+      "toast.deniedBadword": "The room or display name contains a blocked word. Please choose another.",
+      "toast.deniedRoom":    "Invalid room name."
     }
   };
 

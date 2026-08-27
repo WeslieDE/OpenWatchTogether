@@ -21,6 +21,8 @@
  *     live        Bildschirmuebertragung an/aus, und von wem
  *     live-token  nur an den Sender: Token fuer den SFU-Prozess
  *     live-status jemand meldet, ob seine Verbindung zum SFU steht
+ *     denied      Beitritt oder Umbenennung abgelehnt (leerer/gesperrter
+ *                 Raum- oder Anzeigename), die Leitung macht danach zu
  *
  * Wird der letzte Teilnehmer verabschiedet, bleibt die Stelle des laufenden
  * Videos in der Datenbank des Raumes stehen. Wer den Raum wieder aufweckt,
@@ -44,7 +46,9 @@ namespace tk\weslie\WatchTogether\Ws;
 
 use tk\weslie\WatchTogether\Config;
 use tk\weslie\WatchTogether\Db;
+use tk\weslie\WatchTogether\Moderation;
 use tk\weslie\WatchTogether\Rooms;
+use Workerman\Timer;
 
 final class Hub
 {
@@ -64,7 +68,14 @@ final class Hub
         $slug = Rooms::normalize($rawRoom);
         if ($slug === '') {
             $this->to($conn, 'denied', ['reason' => 'room']);
-            $conn->close();
+            $this->closeSoon($conn);
+            return;
+        }
+
+        $name = \mb_substr(\trim($rawName), 0, 24, 'UTF-8');
+        if (Moderation::violates($slug) || Moderation::violates($name)) {
+            $this->to($conn, 'denied', ['reason' => 'badword']);
+            $this->closeSoon($conn);
             return;
         }
 
@@ -77,7 +88,7 @@ final class Hub
            PHP daraus einen Integer-Array-Key und die string-Signaturen
            weiter unten reissen (siehe part()/broadcast()). */
         $id      = 'p' . \bin2hex(\random_bytes(4));
-        $peer    = $room->add($id, \mb_substr(\trim($rawName), 0, 24, 'UTF-8'), $conn);
+        $peer    = $room->add($id, $name, $conn);
 
         $this->seats[$conn->id] = ['slug' => $slug, 'peer' => $id];
 
@@ -245,6 +256,13 @@ final class Hub
                 $name = \mb_substr(\trim((string)($d['name'] ?? '')), 0, 24, 'UTF-8');
                 if ($name === '') {
                     break;
+                }
+                if (Moderation::violates($name)) {
+                    $this->to($conn, 'denied', ['reason' => 'badword']);
+                    unset($this->seats[$conn->id]);
+                    $this->part($room, $slug, $id);
+                    $conn->close();
+                    return;
                 }
                 $room->peers[$id]['name'] = $name;
                 $room->peers[$id]['color'] = Room::colorFor($name);
@@ -476,6 +494,22 @@ final class Hub
     private function to($conn, string $type, array $data): void
     {
         $conn->send(self::pack($type, $data));
+    }
+
+    /**
+     * Fuer eine Ablehnung beim Verbinden: waehrend onWebSocketConnect laeuft,
+     * steht die Handshake-Antwort noch aus - Workerman haelt bereits
+     * gesendete Nachrichten bis dahin in einem eigenen Zwischenspeicher fest.
+     * Ein sofortiges close() wuerde die Verbindung kappen, bevor dieser
+     * Zwischenspeicher (und mit ihm die eben gesendete "denied") ueberhaupt
+     * beim Client ankommt. Der eine Tick Verzoegerung laesst den Handshake
+     * erst fertig werden.
+     */
+    private function closeSoon($conn): void
+    {
+        Timer::add(0.05, static function () use ($conn): void {
+            $conn->close();
+        }, [], false);
     }
 
     private static function pack(string $type, array $data): string

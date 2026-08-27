@@ -30,12 +30,13 @@
 
   /* ------------------------------------------------------------ Konstanten */
 
-  var STORE_NAME  = "wt.name";
-  var STORE_THEME = "wt.theme";
-  var STORE_VOL   = "wt.volume";
-  var STORE_MUTE  = "wt.muted";
-  var STORE_WIDE  = "wt.wide";
+  var STORE_NAME    = "wt.name";
+  var STORE_THEME   = "wt.theme";
+  var STORE_VOL     = "wt.volume";
+  var STORE_MUTE    = "wt.muted";
+  var STORE_WIDE    = "wt.wide";
   var STORE_QUALITY = "wt.quality";
+  var STORE_DENIED  = "wt.denied";
 
   var SYNC_OK   = 0.4;    /* darunter gilt alles als gleich */
   var SYNC_HARD = 20;     /* darueber wird hart gesprungen  */
@@ -489,6 +490,18 @@
       case "live-status":
         var lp = peerById(d.id);
         if (lp) { lp.connected = !!d.connected; renderViewers(); }
+        break;
+
+      /* Der Server hat den Beitritt (oder eine Umbenennung) abgelehnt - etwa
+         wegen eines gesperrten Worts im Raum- oder Anzeigenamen. Es gibt
+         hier nichts zu retten: zurueck auf die Startseite. */
+      case "denied":
+        if (S.conn) S.conn.close();
+        try {
+          global.sessionStorage.setItem(STORE_DENIED,
+            d.reason === "badword" ? t("toast.deniedBadword") : t("toast.deniedRoom"));
+        } catch (e) { /* ohne Speicher eben ohne Hinweis auf der Startseite */ }
+        global.location.href = global.location.pathname;
         break;
     }
   }
@@ -2772,9 +2785,22 @@
 
   function start() {
     closeVeil(el.veilLink);
+
+    var deniedMsg = null;
+    try {
+      deniedMsg = global.sessionStorage.getItem(STORE_DENIED);
+      global.sessionStorage.removeItem(STORE_DENIED);
+    } catch (e) { /* ohne Speicher kein Hinweis, aber kein Absturz */ }
+
     var slug = new URLSearchParams(global.location.search).get("raum");
-    if (slug && slugify(slug)) enterRoom(slugify(slug), false);
-    else openVeil(el.veilRoom, el.inpRoom);
+    if (deniedMsg) {
+      openVeil(el.veilRoom, el.inpRoom);
+      toast(deniedMsg);
+    } else if (slug && slugify(slug)) {
+      enterRoom(slugify(slug), false);
+    } else {
+      openVeil(el.veilRoom, el.inpRoom);
+    }
   }
 
   boot();
