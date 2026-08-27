@@ -191,7 +191,9 @@ final class Db
             'addedById' => $row['added_by_id'] !== null ? (string)$row['added_by_id'] : null,
             'duration'  => (float)$row['duration'],
             'bytes'     => (int)$row['bytes'],
-            'url'       => 'api/index.php?do=media&' . $q,
+            /* Kommt direkt vom Webserver, nicht mehr ueber PHP - siehe Alias
+               fuer /media in docker/watch-together.conf. */
+            'url'       => 'media/' . Rooms::id($slug) . '/' . \rawurlencode((string)$row['file']),
             'poster'    => $row['poster'] !== null && $row['poster'] !== ''
                 ? 'api/index.php?do=poster&' . $q
                 : null,

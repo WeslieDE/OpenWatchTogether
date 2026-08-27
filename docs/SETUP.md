@@ -368,8 +368,16 @@ media/<RoomID>/
 ```
 
 The room ID is a hash of the room name. Uploaded files are renamed to random,
-unique names and are only ever served through the API — nobody can guess a URL
-and stumble into your files.
+unique names.
+
+**Videos are served directly by the web server**, not through PHP — the queue
+hands the browser a static URL under `/media/…` (Apache aliases it straight to
+`WT_DATA_DIR/media`, see `docker/watch-together.conf`), which avoids spending a
+PHP process on every byte read while seeking. That alias only allows video file
+extensions through; everything else in the same folder (`room.sqlite`,
+thumbnails, `parts/`) stays blocked, but there is deliberately **no access
+control on the video files themselves** — anyone who has (or guesses) the URL
+can fetch them. Thumbnails are small and still go through `do=poster`.
 
 Your own name, theme and volume are stored in your browser's local storage
 (`wt.name`, `wt.theme`, `wt.volume`, `wt.muted`). They never travel over the
@@ -381,12 +389,14 @@ connection.
 
 ### Architecture
 
-The whole site is a **single HTML page**. It talks to the server two ways:
+The whole site is a **single HTML page**. It talks to the server three ways:
 
 ```
                   ┌──── AJAX (HTTP) ────▶  api/index.php     uploads, rooms,
-Browser  ─────────┤                                          queue, video delivery
- (index.html)     └──── WebSocket ──────▶  ws/server.php     positions, play state,
+Browser  ─────────┤                                          queue, thumbnails
+ (index.html)     ├──── static HTTP ────▶  /media/…          the video files,
+                  │                                          served directly
+                  └──── WebSocket ──────▶  ws/server.php     positions, play state,
                                                              who's in the room
 ```
 
@@ -415,8 +425,10 @@ Everything goes through `api/index.php?do=…` and answers with JSON.
 | `upload-finish` | Rename, probe runtime, cut thumbnail, add to the queue |
 | `upload-abort` | Throw the transfer away |
 | `remove` | Delete a video, its file and its thumbnail |
-| `media` | Serve a video, with range requests so seeking works |
 | `poster` | Serve a thumbnail |
+
+The video files themselves don't go through this API — see
+[Where your data lives](#where-your-data-lives).
 
 Uploads are chunked (4 MB by default). That avoids large values in `php.ini`,
 makes the progress bar accurate, and lets a transfer be cancelled at any moment.

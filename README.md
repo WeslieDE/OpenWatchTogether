@@ -250,9 +250,9 @@ explicitly told to keep its videos.
 **Formats:** anything the browser plays directly — MP4, WebM, OGG. Nothing is
 transcoded, so playback starts instantly. MKV and AVI are politely refused.
 
-**Privacy:** videos are renamed to random names, stored outside the web root and
-only ever served through the API. Your name, theme and volume never leave your
-browser.
+**Privacy:** videos are renamed to random names and served straight from the
+web server (not through PHP), under a URL that's hard to guess but not
+access-controlled. Your name, theme and volume never leave your browser.
 
 **Under the hood:** one HTML page, a plain PHP API for uploads and rooms, and a
 long-running PHP process handling the live connection over WebSockets.

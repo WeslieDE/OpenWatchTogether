@@ -10,8 +10,12 @@
  *   do=upload-finish   fertig: umbenennen, Laufzeit, Vorschaubild, eintragen
  *   do=upload-abort    Uebertragung wegwerfen
  *   do=remove          Video aus der Warteschlange loeschen, samt Datei
- *   do=media           Video ausliefern, mit Unterstuetzung fuer Sprungmarken
  *   do=poster          Vorschaubild ausliefern
+ *
+ * Die Videos selbst laufen nicht mehr hierueber: die Warteschlange nennt dem
+ * Browser eine statische Adresse unter /media/, die der Webserver direkt
+ * ausliefert (siehe docker/watch-together.conf). Das spart PHP fuer jedes
+ * gelesene Stueck der Datei.
  */
 declare(strict_types=1);
 
@@ -35,8 +39,7 @@ final class Api
                 case 'upload-finish': self::uploadFinish();break;
                 case 'upload-abort':  self::uploadAbort(); break;
                 case 'remove':        self::remove();      break;
-                case 'media':         self::media(false);  break;
-                case 'poster':        self::media(true);   break;
+                case 'poster':        self::poster();      break;
                 default:
                     throw new ApiError('unknown', 'Unbekannter Aufruf.', 404);
             }
@@ -175,7 +178,7 @@ final class Api
 
     /* ------------------------------------------------------- Auslieferung -- */
 
-    private static function media(bool $poster): void
+    private static function poster(): void
     {
         $slug = self::slug();
         $id   = (string)($_GET['id'] ?? '');
@@ -188,7 +191,7 @@ final class Api
             self::plain(404, 'Nicht gefunden.');
         }
 
-        $name = $poster ? (string)($row['poster'] ?? '') : (string)$row['file'];
+        $name = (string)($row['poster'] ?? '');
         if ($name === '') {
             self::plain(404, 'Nicht gefunden.');
         }
@@ -199,13 +202,10 @@ final class Api
         }
 
         Rooms::touch($slug);
-        self::send($path, $poster ? 'image/jpeg' : (string)$row['mime']);
+        self::send($path, 'image/jpeg');
     }
 
-    /**
-     * Datei ausliefern. Bereichsanfragen muessen sein, sonst laesst sich im
-     * Video nicht springen.
-     */
+    /** Datei ausliefern. */
     private static function send(string $path, string $mime): void
     {
         $size  = (int)\filesize($path);
