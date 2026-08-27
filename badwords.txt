@@ -1,0 +1,255 @@
+# badwords.txt
+# Blocklist fuer automatische Moderation von Benutzernamen und Raumnamen.
+#
+# Quellen (recherchiert, nicht frei erfunden):
+#   - LDNOOBW "List of Dirty, Naughty, Obscene, and Otherwise Bad Words"
+#     https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words
+#     (Listen "de" und "en")
+#   - dsojevic/profanity-list (englische Liste mit Tags severity/racial/religious)
+#     https://github.com/dsojevic/profanity-list
+#   - Wikipedia "List of religious slurs"
+#     https://en.wikipedia.org/wiki/List_of_religious_slurs
+#   - Deutsche NS-/Volksverhetzungs-Begriffe: allgemein bekannte, in
+#     Deutschland/Oesterreich rechtlich relevante Begriffe (§86a, §130 StGB)
+# Aus jeder Quelle wurde nur eine kuratierte Teilmenge uebernommen: neutrale/
+# mehrdeutige Woerter (z.B. reine Koerperteile, Eigennamen, Trinkbezeichnungen)
+# wurden bewusst weggelassen, damit die Liste gezielt Beleidigungen/Hassrede
+# trifft statt normale Namen faelschlich zu sperren.
+#
+# Format: eine Phrase pro Zeile, Kleinschreibung, keine Sonderzeichen.
+# Empfohlene Anwendung:
+#   1. Eingabe normalisieren: lowercase, Umlaute/Diakritika transliterieren
+#      (ae/oe/ue/ss), Leetspeak-Ersetzungen (0->o, 1->i/l, 3->e, 4->a, 5->s,
+#      7->t, @->a, $->s), Trennzeichen (_, -, ., Leerzeichen) entfernen.
+#   2. Auf Teilstring-Treffer pruefen (nicht nur exakte Gleichheit), da
+#      Benutzer Praefixe/Suffixe anhaengen (z.B. "xX...Xx", Zahlen).
+#   3. Kurze/mehrdeutige Eintraege (<=5 Zeichen, z.B. "kraut", "fick") nur
+#      mit Wortgrenzen pruefen, um False Positives bei harmlosen Namen wie
+#      "Sauerkraut" oder "Frick" zu vermeiden.
+#   4. Diese Liste ist bewusst NICHT erschoepfend gehalten (keine reinen
+#      Zahlencodes, keine allgemeinen religioesen/ethnischen Eigennamen ohne
+#      beleidigenden Kontext). Sie sollte um Meldungen/Reports aus der
+#      eigenen Nutzerbasis ergaenzt werden statt versucht zu werden,
+#      "vollstaendig" zu sein.
+
+# ==========================================================================
+# Schimpfwoerter / Beleidigungen - Deutsch
+# (Quelle: LDNOOBW/de, kuratiert - neutrale Koerper-/Sexualvokabeln entfernt)
+# ==========================================================================
+analritter
+arschficker
+arschlecker
+arschloch
+bratze
+doedel
+fick
+ficken
+flittchen
+fotze
+fratze
+hackfresse
+hure
+hurensohn
+kackbratze
+kacke
+kacken
+kackwurst
+kampflesbe
+luemmel
+moese
+muschi
+nutte
+pisser
+popel
+reudig
+rosette
+schabracke
+schlampe
+scheisse
+scheisser
+schwanzlutscher
+schwuchtel
+vollpfosten
+wichse
+wichsen
+wichser
+missgeburt
+untermensch
+drecksau
+spast
+spasti
+
+# ==========================================================================
+# Schimpfwoerter / Beleidigungen - Englisch
+# (Quelle: LDNOOBW/en + dsojevic/profanity-list, tag "general", severity>=3)
+# ==========================================================================
+fuck
+motherfucker
+cunt
+kunt
+bastard
+bitch
+whore
+slut
+asshole
+arsehole
+dickhead
+bellend
+shithead
+twat
+fucktard
+fuckwit
+fuckhead
+fuckwad
+clusterfuck
+retard
+retarded
+faggot
+fag
+tranny
+shemale
+dyke
+rapist
+pedophile
+pedo
+molester
+
+# ==========================================================================
+# Rassistische / ethnische Begriffe - International
+# (Quelle: dsojevic/profanity-list, tag "racial")
+# ==========================================================================
+beaner
+buddhahead
+camel jockey
+cheese eating surrender monkey
+chinaman
+ching chong
+chink
+coon
+curry muncher
+darkie
+dune coon
+eyetie
+frog eater
+gin jockey
+golliwog
+gook
+greaseball
+honky
+hymie
+jap
+jigaboo
+jungle bunny
+kike
+kraut
+mayonnaise monkey
+negro
+nig nog
+nigga
+nigger
+paki
+petrol sniffer
+pikey
+sand nigger
+sheep shagger
+slant eye
+spearchucker
+spic
+timber nigger
+towelhead
+wagon burner
+wetback
+wigger
+white power
+wog
+zipperhead
+
+# ==========================================================================
+# Rassistische / ethnische Begriffe - lokal (DACH-Raum) problematisch
+# ==========================================================================
+kanake
+kanacke
+kameltreiber
+kuemmeltuerke
+tuerkenschwein
+polacke
+zigeuner
+russenschwein
+scheissauslaender
+neger
+negerlein
+
+# ==========================================================================
+# Nationalsozialismus / Extremismus-Bezuege
+# (in Deutschland/Oesterreich strafrechtlich relevant, §86a/§130 StGB)
+# ==========================================================================
+hitler
+adolfhitler
+sieg heil
+siegheil
+heil hitler
+nsdap
+holocaust leugnen
+holocaustleugnung
+judenschwein
+judensau
+kz lager
+gaskammer
+endloesung
+mein kampf
+
+# ==========================================================================
+# Religioese Hassrede / Slurs
+# (Quelle: Wikipedia "List of religious slurs", kuratiert auf eindeutige,
+# unzweideutige Schimpfwoerter - neutrale Eigenbezeichnungen wie "Isai" oder
+# regionale Ausdruecke ohne klaren beleidigenden Charakter wurden entfernt)
+# ==========================================================================
+christ-killer
+itzig
+jewboy
+mocky
+sheeny
+shylock
+yid
+zhyd
+heeb
+hebe
+rootless cosmopolitan
+red sea pedestrian
+hadji
+muzzie
+shitskin
+rapefugee
+cow piss drinker
+gaumutra
+malaun
+dothead
+pajeet
+mackerel snapper
+taig
+fenian
+bead-rattler
+shaveling
+mick
+christenschwein
+judenlump
+kirchenficker
+papstficker
+
+# ==========================================================================
+# Sexuelle Belaestigung / Grooming-Anspielungen in Namen
+# ==========================================================================
+kinderficker
+kinderschaender
+loli
+lolicon
+shota
+
+# ==========================================================================
+# Impersonation (verschleiert Identitaet von Moderation/Betreibern)
+# ==========================================================================
+admin_official
+official_admin
+support_team_de
+moderator_offiziell
+systemadministrator
