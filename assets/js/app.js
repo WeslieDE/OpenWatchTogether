@@ -1647,7 +1647,7 @@
 
   /* Texte, die im Code entstehen, nach einem Sprachwechsel neu setzen. */
   function refreshTexts() {
-    doc.title = S.room ? t("doc.title", { room: S.room }) : "Watch Together";
+    doc.title = S.room ? t("doc.title", { room: S.room }) : "VRTogether";
     if (S.current) {
       el.nowTitle.textContent = S.current.title;
       el.nowBy.textContent = byLine(S.current, "now.by");

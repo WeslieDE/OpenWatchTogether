@@ -18,14 +18,14 @@
   var DICT = {
 
     de: {
-      "doc.title":        "{room} · Watch Together",
+      "doc.title":        "{room} · VRTogether",
 
       "room.lead":        "Gib einen Raumnamen ein.",
       "room.label":       "Raum",
       "room.hint":        "Buchstaben, Zahlen und Bindestriche.",
       "room.submit":      "Weiter",
       "room.err.empty":   "Bitte einen Namen eingeben.",
-      "room.github":      "Watch Together auf GitHub",
+      "room.github":      "VRTogether auf GitHub",
 
       "suggest.label":    "Vorschläge",
       "suggest.more":     "Andere Vorschläge",
@@ -186,14 +186,14 @@
     },
 
     en: {
-      "doc.title":        "{room} · Watch Together",
+      "doc.title":        "{room} · VRTogether",
 
       "room.lead":        "Enter a room name.",
       "room.label":       "Room",
       "room.hint":        "Letters, numbers and hyphens.",
       "room.submit":      "Continue",
       "room.err.empty":   "Please enter a name.",
-      "room.github":      "Watch Together on GitHub",
+      "room.github":      "VRTogether on GitHub",
 
       "suggest.label":    "Suggestions",
       "suggest.more":     "Other suggestions",
