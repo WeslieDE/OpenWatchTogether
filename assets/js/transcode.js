@@ -10,6 +10,11 @@
    Software-Umwandlung, denn im WASM-Sandkasten gibt es keinen Zugriff auf
    die GPU.
 
+   mp3 laeuft denselben Weg, nur ohne eigene Videospur: dafuer wird
+   COVER_IMAGE als Standbild vor den Ton gelegt, damit am Ende wieder ein
+   normales mp4 herauskommt, das der Rest der App wie jedes andere Video
+   behandeln kann.
+
    ffmpeg.wasm wiegt gut 30 MB und wird darum erst geholt, wenn wirklich
    etwas umzuwandeln ist - nie beim blossen Seitenaufruf.
    ========================================================================= */
@@ -20,7 +25,9 @@
   var doc = global.document;
 
   var VENDOR = "assets/vendor/ffmpeg/";
+  var COVER_IMAGE = "assets/img/VideoImage.png";
   var CONVERTIBLE = /^(mkv|avi)$/;
+  var AUDIO_ONLY = /^(mp3)$/;
 
   /* ---------------------------------------------------------------- Geraet */
 
@@ -34,8 +41,12 @@
     return (name.split(".").pop() || "").toLowerCase();
   }
 
+  function isAudioOnly(file) {
+    return AUDIO_ONLY.test(extOf(file.name));
+  }
+
   function needsConversion(file) {
-    return CONVERTIBLE.test(extOf(file.name));
+    return CONVERTIBLE.test(extOf(file.name)) || isAudioOnly(file);
   }
 
   /* ---------------------------------------------------------- ffmpeg laden */
@@ -82,6 +93,21 @@
     try { ff.terminate(); } catch (e) { /* schon weg */ }
   }
 
+  /* Einmal geladen, reicht fuer die ganze Sitzung - das Bild aendert sich
+     zur Laufzeit nicht. */
+  var coverPromise = null;
+  function loadCover() {
+    if (!coverPromise) {
+      coverPromise = global.fetch(abs(COVER_IMAGE))
+        .then(function (res) {
+          if (!res.ok) throw new Error("Titelbild liess sich nicht laden.");
+          return res.arrayBuffer();
+        })
+        .then(function (buf) { return new Uint8Array(buf); });
+    }
+    return coverPromise;
+  }
+
   /* ------------------------------------------------------------- Sondieren */
   /* "ffmpeg -i" ohne Ausgabedatei bricht immer mit Fehler ab - genau darauf
      kommt es an, denn dabei schreibt ffmpeg die Spurinfo ins Log. */
@@ -123,6 +149,24 @@
     return v > 1 ? 1 : v;
   }
 
+  /* Bei mp3 gibt es keine Videospur zu probieren - stattdessen legt sich
+     COVER_IMAGE als Standbild vor den Ton. "-g 1" erzwingt ein Keyframe pro
+     Bild, obwohl sich das Bild nie aendert: ohne das waere ein Sprung mitten
+     in eine Stunde Ton nicht moeglich, weil der Decoder erst das naechste,
+     womoeglich weit entfernte Keyframe braeuchte. Auf ein Standbild kostet
+     das praktisch nichts. */
+  function audioImageArgs(inName, imgName, outName) {
+    return [
+      "-loop", "1", "-framerate", "1", "-i", imgName,
+      "-i", inName,
+      "-map", "0:v", "-map", "1:a",
+      "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
+      "-vf", "fps=1", "-g", "1", "-keyint_min", "1",
+      "-c:a", "aac", "-b:a", "192k",
+      "-shortest", "-movflags", "+faststart", outName
+    ];
+  }
+
   /**
    * opts: onProgress(fraction 0..1)
    * Rueckgabe: { promise: Promise<File>, cancel() }
@@ -130,25 +174,34 @@
   function convert(file, onProgress) {
     var cancelled = false;
     var ff = null;
+    var audioOnly = isAudioOnly(file);
 
     function guard() {
       if (cancelled) { var e = new Error("Abgebrochen"); e.reason = "aborted"; throw e; }
     }
 
-    var promise = loadFFmpeg().then(function (instance) {
+    var promise = Promise.all([loadFFmpeg(), audioOnly ? loadCover() : null]).then(function (res) {
       guard();
-      ff = instance;
+      ff = res[0];
+      var cover = res[1];
 
       var inName  = "in-" + Math.random().toString(36).slice(2, 8) + "." + extOf(file.name);
       var outName = "out-" + Math.random().toString(36).slice(2, 8) + ".mp4";
+      var imgName = "cover-" + Math.random().toString(36).slice(2, 8) + ".png";
       var onTick = function (e) { if (onProgress) onProgress(clampFrac(e.progress)); };
 
-      return toU8(file)
-        .then(function (data) { guard(); return ff.writeFile(inName, data); })
-        .then(function () { guard(); return probe(ff, inName); })
+      var written = toU8(file).then(function (data) { guard(); return ff.writeFile(inName, data); });
+      if (audioOnly) {
+        written = written.then(function () { guard(); return ff.writeFile(imgName, cover); });
+      }
+
+      return written
+        .then(function () { guard(); return audioOnly ? null : probe(ff, inName); })
         .then(function (info) {
           guard();
-          var args = isRemuxable(info)
+          var args = audioOnly
+            ? audioImageArgs(inName, imgName, outName)
+            : isRemuxable(info)
             ? ["-i", inName, "-c", "copy", "-movflags", "+faststart", outName]
             : ["-i", inName,
                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
@@ -168,6 +221,7 @@
         .then(function (data) {
           ff.deleteFile(inName).catch(function () {});
           ff.deleteFile(outName).catch(function () {});
+          if (audioOnly) ff.deleteFile(imgName).catch(function () {});
           if (!data || !data.length) throw new Error("Die Datei liess sich nicht umwandeln.");
           var blob = new Blob([data.buffer], { type: "video/mp4" });
           return new File([blob], swapExt(file.name, "mp4"), { type: "video/mp4" });

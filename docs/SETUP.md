@@ -509,10 +509,16 @@ video, or sits right before its end, playback starts from the beginning instead.
 
 ### Formats
 
-Only what the browser plays without conversion is accepted — MP4, WebM, OGG and
-whatever else `canPlayType` confirms. Nothing is ever transcoded, which is why
-playback starts instantly. MKV, AVI and similar are rejected with a hint; the rest
-of a multi-file selection still uploads.
+What the browser plays without conversion — MP4, WebM, OGG and whatever else
+`canPlayType` confirms — uploads as-is, so playback starts instantly. MKV, AVI
+and MP3 take a detour through `assets/js/transcode.js` first: ffmpeg.wasm turns
+them into MP4 entirely on the uploading person's device (the server never sees
+the original), before the usual upload continues. MP3 has no video track of its
+own, so `assets/img/VideoImage.png` is muxed in as a static image; MKV/AVI just
+get re-encoded (or remuxed, if H.264/AAC is already inside). This runs on
+desktop only — on mobile the file is rejected with a hint, since ffmpeg.wasm's
+software encoding is too slow there. Anything else is rejected outright; the
+rest of a multi-file selection still uploads.
 
 ### Languages
 
@@ -565,9 +571,11 @@ equivalent, so individual 4 MB chunks aren't rejected.
 `WT_FFPROBE` at them. Playback is unaffected either way.
 
 **A file is rejected when adding it**
-Only formats the browser plays without conversion are accepted — MP4, WebM, OGG
-and whatever else `canPlayType` confirms. MKV, AVI and friends are refused on
-purpose; nothing is transcoded, so playback can start instantly.
+Formats the browser plays without conversion upload directly — MP4, WebM, OGG
+and whatever else `canPlayType` confirms. MKV, AVI and MP3 are converted to MP4
+client-side first (see [Formats](#formats)) and then upload like any other
+video; this needs a desktop browser, since it's rejected on mobile. Anything
+else is refused outright.
 
 **Everything disappeared after a restart**
 Working as designed — see the note about volumes in

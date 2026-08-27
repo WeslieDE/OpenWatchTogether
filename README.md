@@ -247,8 +247,10 @@ left it, including the spot you paused at. The one exception is a room you
 explicitly told to keep its videos.
 → [Details](docs/SETUP.md#nothing-survives-a-restart--and-why-thats-good)
 
-**Formats:** anything the browser plays directly — MP4, WebM, OGG. Nothing is
-transcoded, so playback starts instantly. MKV and AVI are politely refused.
+**Formats:** anything the browser plays directly — MP4, WebM, OGG — uploads
+straight away. MKV, AVI and MP3 are converted to MP4 in the browser first
+(MP3 gets a static cover image as its video track), desktop only.
+→ [Details](docs/SETUP.md#formats)
 
 **Privacy:** videos are renamed to random names and served straight from the
 web server (not through PHP), under a URL that's hard to guess but not
