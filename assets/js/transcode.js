@@ -150,18 +150,25 @@
   }
 
   /* Bei mp3 gibt es keine Videospur zu probieren - stattdessen legt sich
-     COVER_IMAGE als Standbild vor den Ton. "-g 1" erzwingt ein Keyframe pro
-     Bild, obwohl sich das Bild nie aendert: ohne das waere ein Sprung mitten
-     in eine Stunde Ton nicht moeglich, weil der Decoder erst das naechste,
-     womoeglich weit entfernte Keyframe braeuchte. Auf ein Standbild kostet
-     das praktisch nichts. */
+     COVER_IMAGE als Standbild vor den Ton. Die Videospur traegt dabei keine
+     Information (das Bild aendert sich nie), darum so klein und billig wie
+     moeglich: 320p/15fps/500kbit halten die reine Software-Kodierung im
+     WASM-Sandkasten schnell, waehrend der Ton unangetastet bleibt. "scale"
+     rundet zugleich auf eine gerade Breite/Hoehe, denn yuv420p braucht durch
+     das Chroma-Subsampling beides gerade, sonst wuerde libx264 den Encoder
+     gar nicht erst oeffnen. "-g 15" erzwingt ein Keyframe pro Sekunde, obwohl
+     sich das Bild nie aendert: ohne das waere ein Sprung mitten in eine
+     Stunde Ton nicht moeglich, weil der Decoder erst das naechste,
+     womoeglich weit entfernte Keyframe braeuchte - die Frames dazwischen
+     bleiben trotzdem fast umsonst, weil sie exakt gleich sind. */
   function audioImageArgs(inName, imgName, outName) {
     return [
-      "-loop", "1", "-framerate", "1", "-i", imgName,
+      "-loop", "1", "-framerate", "15", "-i", imgName,
       "-i", inName,
       "-map", "0:v", "-map", "1:a",
       "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
-      "-vf", "fps=1", "-g", "1", "-keyint_min", "1",
+      "-vf", "scale=320:-2,fps=15", "-g", "15", "-keyint_min", "15",
+      "-b:v", "500k", "-maxrate", "500k", "-bufsize", "500k",
       "-c:a", "aac", "-b:a", "192k",
       "-shortest", "-movflags", "+faststart", outName
     ];
@@ -191,8 +198,12 @@
       var onTick = function (e) { if (onProgress) onProgress(clampFrac(e.progress)); };
 
       var written = toU8(file).then(function (data) { guard(); return ff.writeFile(inName, data); });
+      /* writeFile() transferiert den Buffer an den Worker und entleert ihn
+         damit im Hauptthread - "cover" wird aber pro Sitzung nur einmal
+         geladen und muss fuer die naechste Datei unversehrt bleiben, darum
+         hier eine frische Kopie statt des gecachten Arrays selbst. */
       if (audioOnly) {
-        written = written.then(function () { guard(); return ff.writeFile(imgName, cover); });
+        written = written.then(function () { guard(); return ff.writeFile(imgName, cover.slice()); });
       }
 
       return written
