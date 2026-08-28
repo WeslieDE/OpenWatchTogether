@@ -214,6 +214,9 @@
   function stored(key) {
     try { return global.localStorage.getItem(key); } catch (e) { return null; }
   }
+  function unstore(key) {
+    try { global.localStorage.removeItem(key); } catch (e) { /* ohne Speicher weiter */ }
+  }
 
   /* ------------------------------------------------------------ Teilnehmer */
 
@@ -494,9 +497,16 @@
 
       /* Der Server hat den Beitritt (oder eine Umbenennung) abgelehnt - etwa
          wegen eines gesperrten Worts im Raum- oder Anzeigenamen. Es gibt
-         hier nichts zu retten: zurueck auf die Startseite. */
+         hier nichts zu retten: zurueck auf die Startseite.
+
+         Ein gesperrter Anzeigename bleibt sonst im Speicher stehen und
+         wuerde beim naechsten Raumbeitritt sofort wieder abgelehnt - eine
+         Schleife, aus der man ohne Cache leeren nicht mehr rauskommt. Der
+         gemerkte Name geht deshalb mit weg, dann fragt die Startseite von
+         selbst wieder danach. */
       case "denied":
         if (S.conn) S.conn.close();
+        if (d.reason === "badword") unstore(STORE_NAME);
         try {
           global.sessionStorage.setItem(STORE_DENIED,
             d.reason === "badword" ? t("toast.deniedBadword") : t("toast.deniedRoom"));
