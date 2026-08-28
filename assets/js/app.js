@@ -2297,6 +2297,12 @@
   var OTHER_VIDEO = /^(wmv|flv|mpg|mpeg|ts|m2ts|mts|vob|3gp|divx|rm|rmvb|asf)$/;
 
   function playable(file) {
+    /* Eine leere Datei bringt ffmpeg.wasm nur mit einer kryptischen,
+       tief aus dem WASM-Kern kommenden Fehlermeldung zu Fall - das faengt
+       diese Prüfung vorher sauber ab. */
+    if (file.size === 0) {
+      return "empty";
+    }
     if (transcode.needsConversion(file)) {
       return transcode.isMobile() ? "mobile" : "convert";
     }
@@ -2315,7 +2321,7 @@
 
   var REASON = {
     novideo: "up.errVideo", format: "up.errType", size: "up.errSize",
-    mobile: "up.errMobile"
+    mobile: "up.errMobile", empty: "up.errEmpty"
   };
 
   function cleanTitle(fileName) {
