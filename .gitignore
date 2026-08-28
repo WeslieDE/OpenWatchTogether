@@ -21,6 +21,9 @@ config.local.php
 /media/
 /data/
 
+# Laufzeitdaten von HLSStream (HLS-Segmente/Playlists je Raum) - fluechtig
+/HLSStream/data/
+
 # IDE
 /.idea/
 *.iml

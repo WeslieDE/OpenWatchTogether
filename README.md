@@ -86,6 +86,18 @@ reconnects on its own if the connection hiccups.
 
 See [Screen sharing](docs/livestream.md) for how it's built.
 
+### 📡 Every room is also a plain HLS stream
+Alongside the web app, each room is reachable under a fixed
+`/stream/<room>.m3u8` URL — for a TV, Chromecast, OBS, or any regular video
+player, no browser required. It shows exactly what the room is doing: a
+video at its current playback position, a live screen share, or a paused
+picture when nothing is playing. A small, purpose-built background service
+joins a room the moment someone requests its stream and leaves again once
+nobody's watching — the stream itself never stutters or drops, even while
+what's behind it changes.
+
+See [HLSStream](docs/hlsstream.md) for how it's built.
+
 ### ✅ Ready when everyone is (optional)
 Switch the ready check on and a video change works like a lobby in a game: a
 striped overlay lies over the picture with one big button in the middle, red

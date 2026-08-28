@@ -101,6 +101,7 @@
 
     veilSettings: $("veilSettings"), formSettings: $("formSettings"),
     setKeep: $("setKeep"), setGo: $("setGo"),
+    setStreamUrl: $("setStreamUrl"), btnCopyStreamUrl: $("btnCopyStreamUrl"),
     setOpening: $("setOpening"), setEnding: $("setEnding"),
     errSettings: $("errSettings"), btnSettings: $("btnSettings"),
     btnSetClose: $("btnSetClose"), btnSetCancel: $("btnSetCancel"),
@@ -2023,14 +2024,17 @@
   }
 
   el.btnCopyLink.addEventListener("click", function () {
-    var url = global.location.href;
-    if (global.navigator.clipboard && global.navigator.clipboard.writeText) {
-      global.navigator.clipboard.writeText(url).then(
-        function () { toast(t("toast.copied"), "i-check"); },
-        function () { fallbackCopy(url); }
-      );
-    } else fallbackCopy(url);
+    copyToClipboard(global.location.href);
   });
+
+  function copyToClipboard(text) {
+    if (global.navigator.clipboard && global.navigator.clipboard.writeText) {
+      global.navigator.clipboard.writeText(text).then(
+        function () { toast(t("toast.copied"), "i-check"); },
+        function () { fallbackCopy(text); }
+      );
+    } else fallbackCopy(text);
+  }
 
   function fallbackCopy(text) {
     var ta = doc.createElement("textarea");
@@ -2165,9 +2169,17 @@
   /* Nichts eingestellt bleibt ein leeres Feld, nicht "0:00". */
   function spanText(secs) { return secs > 0 ? tc(secs) : ""; }
 
+  /* Feste Adresse fuer den HLS-Stream dieses Raums, siehe HLSStream/ und
+     docs/hlsstream.md - derselbe Rauname wie in der Adresszeile, nur als
+     Pfad statt als Query-Parameter. */
+  function streamUrl() {
+    return global.location.origin + "/stream/" + encodeURIComponent(S.room) + ".m3u8";
+  }
+
   function openSettings() {
     el.setKeep.checked  = S.settings.keep;
     el.setGo.checked    = S.settings.go;
+    el.setStreamUrl.value = streamUrl();
     el.setOpening.value = spanText(S.settings.opening);
     el.setEnding.value  = spanText(S.settings.ending);
     el.errSettings.hidden = true;
@@ -2179,6 +2191,9 @@
   el.btnSettings.addEventListener("click", openSettings);
   el.btnSetClose.addEventListener("click", closeSettings);
   el.btnSetCancel.addEventListener("click", closeSettings);
+  el.btnCopyStreamUrl.addEventListener("click", function () {
+    copyToClipboard(el.setStreamUrl.value);
+  });
 
   doc.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && !el.veilSettings.hidden) closeSettings();

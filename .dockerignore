@@ -6,6 +6,10 @@ tools/
 vendor/
 composer.phar
 
+# Laufzeitdaten von HLSStream (Segmente/Playlists je Raum) - fluechtig wie
+# der Rest der App, hat im Bild nichts verloren.
+HLSStream/data/
+
 .git/
 .gitignore
 .idea/

@@ -285,6 +285,16 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .input:hover { border-color: var(--text-3); }
 .input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 
+/* Nur-Lese-Feld mit Kopier-Knopf daneben, etwa die HLS-Stream-Adresse. */
+.field-copy { display: flex; gap: 8px; }
+.field-copy .input { flex: 1; cursor: text; }
+.field-copy .icon-btn {
+  width: 44px; height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+}
+.field-copy .icon-btn:hover { border-color: var(--accent); color: var(--text); }
+
 .field-hint  { font-size: 12.5px; color: var(--text-3); }
 .field-error { font-size: 12.5px; color: var(--accent); font-weight: 550; }
 .field-error[hidden] { display: none; }

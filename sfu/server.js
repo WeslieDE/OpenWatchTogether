@@ -36,9 +36,17 @@
  *   Client an Server
  *     create-transport {direction: send|recv}
  *     connect-transport {transportId, dtlsParameters}
+ *     create-plain-transport {}                      nur mit role=consume
+ *     connect-plain-transport {transportId, ip, port} nur mit role=consume
  *     produce {transportId, kind, rtpParameters}     nur mit role=produce
  *     consume {producerId, rtpCapabilities}
  *     resume-consumer {consumerId}
+ *
+ *   create-plain-transport/connect-plain-transport sind das Plain-RTP-
+ *   Gegenstueck zu create-transport/connect-transport, fuer Zuschauer ohne
+ *   eigenes WebRTC (ICE/DTLS) - der SFU schickt das RTP dann direkt an eine
+ *   von diesem Client angegebene IP:Port. "consume"/"resume-consumer"
+ *   danach sind identisch, siehe conn.recvTransport.
  * ========================================================================= */
 
 const mediasoup = require('mediasoup');
@@ -256,6 +264,37 @@ async function onMessage(room, conn, raw) {
         if (!transport) break;
         await transport.connect({ dtlsParameters: d.dtlsParameters });
         send(conn.ws, 'transport-connected', { transportId: transport.id });
+        break;
+      }
+
+      /* Plain-RTP-Variante von create-transport/connect-transport, fuer
+         Zuschauer, die selbst kein WebRTC (ICE/DTLS) sprechen - etwa
+         HLSStream, das eine laufende Uebertragung an ffmpeg weiterreicht
+         (siehe HLSStream/internal/sfuclient). Kein Sonderfall fuer diesen
+         einen Anwendungsfall: eine allgemeine RTP-Ausgabe fuer beliebige
+         Consumer ohne Browser-WebRTC. Nur fuer role=consume gedacht - der
+         entstehende Transport landet wie beim WebRTC-Pendant in
+         conn.recvTransport, "consume"/"resume-consumer" darunter bleiben
+         unveraendert. */
+      case 'create-plain-transport': {
+        if (conn.role !== 'consume') break;
+        const transport = await room.router.createPlainTransport({
+          listenIp: '127.0.0.1',
+          rtcpMux: true,
+          comedia: false,
+        });
+        conn.transports.set(transport.id, transport);
+        conn.recvTransport = transport;
+
+        send(conn.ws, 'plain-transport-created', { id: transport.id });
+        break;
+      }
+
+      case 'connect-plain-transport': {
+        const transport = conn.transports.get(String(d.transportId));
+        if (!transport) break;
+        await transport.connect({ ip: String(d.ip), port: Number(d.port) });
+        send(conn.ws, 'plain-transport-connected', { transportId: transport.id });
         break;
       }
 

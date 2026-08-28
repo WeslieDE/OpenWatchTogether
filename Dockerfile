@@ -1,15 +1,27 @@
-# Watch Together. Ein Bild, drei Prozesse: Apache mit der API, daneben der
-# langlaufende Prozess fuer die Live-Verbindung und der SFU-Prozess fuer die
-# Bildschirmuebertragung (WebRTC/mediasoup, Node.js).
+# Watch Together. Ein Bild, vier Prozesse: Apache mit der API, der
+# langlaufende Prozess fuer die Live-Verbindung, der SFU-Prozess fuer die
+# Bildschirmuebertragung (WebRTC/mediasoup, Node.js) und HLSStream, das
+# Raeume zusaetzlich als HLS-Stream anbietet (Go, siehe docs/hlsstream.md).
 #
 # Zustandslos. Alles Gespeicherte liegt unter /data und wird beim Start
 # verworfen. Ein Volume ist ausdruecklich nicht noetig - erst wenn Raeume ihre
 # Videos ueber den Container hinaus behalten sollen, lohnt eines.
 
+# HLSStream wird in einem eigenen Stage aus Quellcode zu einem einzigen
+# statischen Binary uebersetzt - der Go-Compiler selbst landet nicht im
+# fertigen Bild, nur das fertige Programm.
+FROM golang:1.23-bookworm AS hlsbuild
+WORKDIR /src
+COPY HLSStream/go.mod HLSStream/go.sum ./
+RUN go mod download
+COPY HLSStream/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /hlsstream ./cmd/hlsstream
+
 FROM php:8.3-apache
 
-# ffmpeg fuer Laufzeit und Vorschaubild, supervisor haelt alle drei Prozesse
-# am Leben. In der Entwicklung unter Windows liegt ffmpeg stattdessen
+# ffmpeg fuer Laufzeit und Vorschaubild (auch fuer HLSStream), supervisor
+# haelt alle vier Prozesse am Leben. In der Entwicklung unter Windows liegt
+# ffmpeg stattdessen
 # portabel im Projektordner unter tools/.
 #
 # unzip braucht Composer, um Pakete auszupacken. Das Grundabbild bringt weder
@@ -28,7 +40,7 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends nodejs; \
     rm -rf /var/lib/apt/lists/*; \
     docker-php-ext-install pcntl; \
-    a2enmod proxy proxy_wstunnel; \
+    a2enmod proxy proxy_wstunnel proxy_http; \
     php -r 'exit(extension_loaded("pdo_sqlite") ? 0 : 1);'
 
 # Die Live-Verbindung laeuft ueber denselben Port wie die Seite.
@@ -50,6 +62,8 @@ RUN composer install --no-dev --no-interaction --optimize-autoloader --no-script
 
 COPY sfu/package.json sfu/package-lock.json ./sfu/
 RUN cd sfu && npm ci --omit=dev
+
+COPY --from=hlsbuild /hlsstream /usr/local/bin/hlsstream
 
 COPY . .
 

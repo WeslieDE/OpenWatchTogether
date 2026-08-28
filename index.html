@@ -221,6 +221,17 @@
         <input class="switch" id="setGo" type="checkbox" role="switch">
       </label>
 
+      <!-- HLS-Stream. Nur zum Anzeigen/Kopieren, keine eigene Eingabe. -->
+      <div class="field">
+        <label class="field-label" for="setStreamUrl" data-i18n="set.stream.label"></label>
+        <div class="field-copy">
+          <input class="input mono" id="setStreamUrl" type="text" readonly spellcheck="false">
+          <button class="icon-btn" type="button" id="btnCopyStreamUrl" data-i18n-attr="title:top.copy">
+            <svg><use href="#i-copy"/></svg></button>
+        </div>
+        <p class="field-hint" data-i18n="set.stream.hint"></p>
+      </div>
+
       <!-- Vorspann und Abspann. Leer heisst: ganz von vorn bis ganz zum Schluss. -->
       <div class="group">
         <div class="group-head">

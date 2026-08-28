@@ -292,6 +292,14 @@ Every setting is an environment variable, and every one has a sensible default.
 | `WT_SFU_PORT` | `42000` | Shared UDP/TCP media port for screen sharing — the one extra port to publish |
 | `WT_SFU_ANNOUNCED_IP` | *(unset)* | Public IP/hostname the SFU announces to browsers — **required** for screen sharing to work outside your own machine |
 | `WT_SFU_SECRET` | *(empty)* | Shared secret between the live connection and the SFU process; see [Screen sharing](livestream.md) |
+| `WT_HLS_HTTP_HOST` / `WT_HLS_HTTP_PORT` | `127.0.0.1` / `8083` | Internal address of the HLSStream playlist server, proxied through `/stream/` |
+| `WT_HLS_IDLE_SECONDS` | `30` | How long a room stays joined without an HLS playlist request before HLSStream leaves it |
+| `WT_HLS_FFMPEG` / `WT_HLS_FFPROBE` | `ffmpeg` / `ffprobe` from `PATH` | Same idea as `WT_FFMPEG`/`WT_FFPROBE`, for the HLS service |
+| `WT_HLS_DATA_DIR` | `HLSStream/data` in Docker | Where per-room HLS playlists/segments are written |
+| `WT_HLS_PAUSED_IMAGE` | `HLSStream/assets/VideoPaused.png` | Shown on the HLS stream while nothing is playing or it's paused |
+
+See [HLSStream](hlsstream.md) for the full picture — every room is also
+reachable as a plain `/stream/<room>.m3u8` URL, no new port to publish.
 
 ### Upload limits
 
@@ -411,6 +419,7 @@ Browser  ─────────┤                                         
 | Page & API | PHP 8 behind Apache/nginx — plain request/response, no framework |
 | Live connection | A long-running PHP process using [Workerman](https://github.com/walkor/workerman) |
 | Screen sharing (SFU) | A long-running Node.js process using [mediasoup](https://mediasoup.org), see [Screen sharing](livestream.md) |
+| HLS streaming | A long-running Go process (`HLSStream/`), joins active rooms as a plain client, see [HLSStream](hlsstream.md) |
 | Per-room storage | One SQLite file per room (`room.sqlite`) |
 | Runtime & thumbnails | `ffmpeg` / `ffprobe`, called once per upload |
 
