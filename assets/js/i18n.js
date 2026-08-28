@@ -186,7 +186,12 @@
       "toast.linkBack": "Wieder verbunden",
 
       "toast.deniedBadword": "Raum- oder Anzeigename enthält ein gesperrtes Wort. Bitte anders wählen.",
-      "toast.deniedRoom":    "Ungültiger Raumname."
+      "toast.deniedRoom":    "Ungültiger Raumname.",
+
+      "legal.imprint": "Impressum",
+      "legal.privacy": "Datenschutz",
+      "legal.tos":     "Nutzungsbedingungen",
+      "legal.report":  "Missbrauch melden"
     },
 
     en: {
@@ -358,7 +363,12 @@
       "toast.linkBack": "Back online",
 
       "toast.deniedBadword": "The room or display name contains a blocked word. Please choose another.",
-      "toast.deniedRoom":    "Invalid room name."
+      "toast.deniedRoom":    "Invalid room name.",
+
+      "legal.imprint": "Imprint",
+      "legal.privacy": "Privacy",
+      "legal.tos":     "Terms of Service",
+      "legal.report":  "Report abuse"
     }
   };
 

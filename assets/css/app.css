@@ -363,6 +363,30 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 .foot-link:hover { color: var(--text); background: var(--surface-3); }
 .foot-link:focus-visible { color: var(--text); background: var(--surface-3); }
 
+.sheet-legal {
+  margin: 8px 0 0; text-align: center;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 3px 4px;
+}
+.sheet-legal a {
+  color: var(--text-3); font-size: 11.5px; text-decoration: none;
+  padding: 3px 7px; border-radius: var(--r-pill);
+}
+.sheet-legal a:hover, .sheet-legal a:focus-visible { color: var(--text); background: var(--surface-3); }
+
+/* Unauffaellig unten links. Steht im normalen Fluss statt fest ueber dem
+   Inhalt zu schweben - bei viel Inhalt (Protokoll, Warteschlange) wuerde
+   sie sonst darueberliegen statt darunterzustehen. */
+.app-legal {
+  display: flex; flex-wrap: wrap; gap: 2px 10px;
+  padding: 6px 18px 10px;
+  opacity: .5; transition: opacity .18s var(--ease);
+}
+.app-legal:hover, .app-legal:focus-within { opacity: 1; }
+.app-legal a {
+  color: var(--text-3); font-size: 10.5px; text-decoration: none;
+}
+.app-legal a:hover, .app-legal a:focus-visible { color: var(--text); text-decoration: underline; }
+
 /* ---------------------------------------------------------------- Topbar --- */
 
 .app[hidden] { display: none; }

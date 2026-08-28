@@ -1,0 +1,134 @@
+/* ============================================================================
+   tk.weslie.WatchTogether - Rechtstexte
+
+   Eigenstaendiges, schlankes Stylesheet fuer die vier statischen Seiten
+   (Impressum, Datenschutz, Nutzungsbedingungen, Melden). Teilt sich die
+   Farbtoken mit assets/css/app.css, bindet die Datei aber bewusst nicht ein -
+   der Rest von app.css gehoert zur Anwendung, nicht zu einer Textseite.
+   ========================================================================= */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  color-scheme: light;
+  --bg:          #f3f3f4;
+  --surface:     #ffffff;
+  --surface-2:   #fafafa;
+  --line:        #e5e5e7;
+  --text:        #17171a;
+  --text-2:      #55555d;
+  --text-3:      #86868f;
+  --accent:      #c9431a;
+  --accent-soft: #fdeee8;
+  --accent-line: #f3cdbe;
+  --r-surface: 14px;
+  --r-control: 10px;
+  --r-pill:    999px;
+  --sans: "Segoe UI Variable Display", "Segoe UI", ui-sans-serif, system-ui,
+          -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:          #0c0c0e;
+  --surface:     #141417;
+  --surface-2:   #1a1a1e;
+  --line:        #26262c;
+  --text:        #f2f2f3;
+  --text-2:      #a6a6b0;
+  --text-3:      #75757f;
+  --accent:      #ff7a45;
+  --accent-soft: #2a1509;
+  --accent-line: #4a2412;
+}
+
+:root[data-theme="dim"] {
+  color-scheme: dark;
+  --bg:          #2b2b30;
+  --surface:     #34343b;
+  --surface-2:   #3b3b43;
+  --line:        #505059;
+  --text:        #f0f0f1;
+  --text-2:      #c2c2c9;
+  --text-3:      #97979f;
+  --accent:      #ff8a5c;
+  --accent-soft: #3a2013;
+  --accent-line: #5a3018;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dim"]) {
+    color-scheme: dark;
+    --bg:          #0c0c0e;
+    --surface:     #141417;
+    --surface-2:   #1a1a1e;
+    --line:        #26262c;
+    --text:        #f2f2f3;
+    --text-2:      #a6a6b0;
+    --text-3:      #75757f;
+    --accent:      #ff7a45;
+    --accent-soft: #2a1509;
+    --accent-line: #4a2412;
+  }
+}
+
+html, body { background: var(--bg); }
+body {
+  margin: 0; color: var(--text); font: 15px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.legal-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 18px 20px; border-bottom: 1px solid var(--line);
+}
+.legal-brand {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--text); text-decoration: none; font-weight: 620;
+  letter-spacing: -.02em; font-size: 15.5px;
+}
+.legal-logomark {
+  display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: 8px; background: var(--accent); color: #fff; flex: none;
+}
+.legal-logomark svg { width: 16px; height: 16px; }
+
+.legal-main {
+  max-width: 760px; margin: 0 auto; padding: 36px 20px 64px;
+}
+.legal-main h1 {
+  font-size: 26px; letter-spacing: -.02em; margin: 0 0 6px;
+}
+.legal-updated { color: var(--text-3); font-size: 13px; margin: 0 0 32px; }
+
+.legal-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-surface); padding: 28px 30px;
+}
+
+.legal-card h2 {
+  font-size: 16.5px; letter-spacing: -.01em; margin: 28px 0 8px;
+}
+.legal-card h2:first-child { margin-top: 0; }
+.legal-card p { color: var(--text-2); margin: 0 0 12px; }
+.legal-card ul { color: var(--text-2); margin: 0 0 12px; padding-left: 20px; }
+.legal-card li { margin: 0 0 6px; }
+.legal-card strong { color: var(--text); }
+.legal-card a { color: var(--accent); }
+
+.legal-note {
+  margin-top: 18px; padding: 12px 14px; border-radius: var(--r-control);
+  background: var(--accent-soft); border: 1px solid var(--accent-line);
+  color: var(--text-2); font-size: 13.5px;
+}
+
+.legal-footer {
+  display: flex; flex-wrap: wrap; gap: 6px 4px;
+  max-width: 760px; margin: 22px auto 0; padding: 0 20px;
+}
+.legal-footer a {
+  color: var(--text-3); font-size: 12.5px; text-decoration: none;
+  padding: 5px 10px; border-radius: var(--r-pill);
+}
+.legal-footer a:hover, .legal-footer a:focus-visible { color: var(--text); background: var(--surface-2); }
+.legal-footer span { color: var(--text-3); font-size: 12.5px; padding: 5px 0; }

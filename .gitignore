@@ -11,6 +11,9 @@ composer.phar
 # Local settings, never shared
 config.local.php
 
+# Contains real contact data - copy legal/impressum.example.html instead
+/legal/impressum.html
+
 # Internal planning notes
 /planung.md
 
