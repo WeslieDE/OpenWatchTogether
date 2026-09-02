@@ -121,14 +121,46 @@ Pipes *hineinschreibt* ("Quelle"), wird ausgetauscht:
 - **Standbild** — `HLSStream/assets/VideoPaused.png`, sobald gerade nichts
   läuft oder pausiert ist.
 
-Ein Wechsel beendet den alten Quell-Prozess und startet sofort einen neuen
-mit denselben Pipe-Enden — der Encoder merkt davon höchstens einen kurzen
-Stillstand von einigen hundert Millisekunden, nie einen Abriss der
-Playlist. Die periodischen ~2-Sekunden-Taktmeldungen des Raums selbst lösen
-**keinen** Neustart aus (das würde ständig stottern) — nur ein tatsächlicher
-Wechsel (anderes Video, Play/Pause, ein Sprung von mehr als 2 Sekunden
-gegenüber der eigenen Hochrechnung, oder Beginn/Ende einer
-Bildschirmübertragung).
+Ein Wechsel beendet den alten Quell-Prozess (`Proc.Stop()`, SIGKILL — siehe
+unten, warum das kein sauberes Dateiende ist) und startet sofort einen neuen.
+Der Encoder merkt davon höchstens einen kurzen Stillstand von einigen
+hundert Millisekunden, nie einen Abriss der Playlist. Die periodischen
+~2-Sekunden-Taktmeldungen des Raums selbst lösen **keinen** Neustart aus
+(das würde ständig stottern) — nur ein tatsächlicher Wechsel (anderes Video,
+Play/Pause, ein Sprung von mehr als 2 Sekunden gegenüber der eigenen
+Hochrechnung, oder Beginn/Ende einer Bildschirmübertragung).
+
+### Kein Quell-Prozess schreibt direkt in die dauerhafte Pipe
+
+Naiv gebaut würde jeder Quell-Prozess sein rohes Bild/Ton direkt in dieselbe
+dauerhafte Pipe schreiben, aus der der eine, langlebige Encoder-Prozess
+liest — das war der ursprüngliche Entwurf, und er hatte einen Fehler, der
+sich erst nach mehreren Quellwechseln zeigte: sichtbar zunehmend zerstörte,
+farbverschobene/kachelartige Bildfehler, die sich nie von selbst erholten.
+
+Ursache: `Proc.Stop()` beendet einen Quell-Prozess *sofort* per SIGKILL,
+ohne auf ein sauberes Dateiende zu warten. Der Encoder liest seine Pipes
+aber ohne jede Framing-Information — nur eine feste Bytezahl je Bild bzw.
+Sample-Gruppe (`-f rawvideo -s 1280x720` bzw. `-f s16le`, siehe
+`encoder.args()`). Traf das SIGKILL einen Quell-Prozess mitten im
+Herausschreiben eines Bildes, blieb ein angebrochener Rest in der Pipe
+liegen; der nächste Quell-Prozess schrieb direkt im Anschluss seine eigenen,
+korrekten Bilder hinterher — ab diesem Punkt las der Encoder aber **jedes**
+folgende Bild um genau diese Reststbytezahl verschoben, für den Rest der
+Raum-Lebensdauer, unabhängig davon, welche Quelle als nächstes lief. Jeder
+weitere Wechsel konnte einen weiteren solchen Rest hinzufügen, daher der
+kumulative Effekt ("wird mit jedem Wechsel schlimmer").
+
+Die Lösung: kein Quell-Prozess bekommt die dauerhafte Pipe je zu Gesicht.
+`pipeline.newFramePipe()` legt für jeden einzelnen Quell-Prozess ein eigenes,
+kurzlebiges Pipe-Paar an; eine Weiterleitungs-Goroutine liest davon in exakt
+bildgroßen Häppchen (`io.ReadFull`) und reicht nur *vollständige* Häppchen an
+die dauerhafte Pipe weiter — ein angebrochener Rest beim Tod des
+Quell-Prozesses wird verworfen statt weitergereicht. Ein Mutex je Pipe
+(`Pipes.videoMu`/`audioMu`) verhindert außerdem, dass die Weiterleitung der
+gerade beendeten und die der neuen Quelle sich für den kurzen Moment des
+Wechsels gegenseitig ins Wort fallen und ihre Schreibvorgänge ineinander
+mischen.
 
 ### Bild und Ton bleiben auch über viele Wechsel synchron
 

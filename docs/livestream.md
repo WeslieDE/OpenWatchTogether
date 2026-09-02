@@ -120,12 +120,15 @@ free.
   quality sooner.
 - **Degradation preference**: the captured track gets `contentHint =
   "motion"` (`assets/js/app.js`) so the encoder doesn't default to
-  sacrificing framerate first under pressure. Left alone that would let it
-  sacrifice *resolution* almost without limit instead — smooth but mushy.
-  `assets/js/webrtc.js` overrides this back to `degradationPreference =
-  "balanced"` on the underlying `RTCRtpSender` right after producing, so
-  resolution and framerate are traded off against each other rather than
-  either one being sacrificed outright.
+  sacrificing framerate first under pressure. `assets/js/webrtc.js` pins
+  `degradationPreference = "maintain-resolution"` on the underlying
+  `RTCRtpSender` right after producing, for all three quality presets. A
+  mid-stream *resolution* change in the encoded RTP (which used to happen
+  under `"balanced"`/`"maintain-framerate"` when bandwidth dropped) causes
+  brief VP8 decode corruption in the HLSStream bridge — visible as garbled
+  blocks/color artifacts until the next full keyframe. Pinning the
+  resolution trades that off against framerate drops instead, which don't
+  have this failure mode.
 
 Audio is left as a single, unscaled Opus stream — it costs little enough
 that adapting it isn't worth the complexity.

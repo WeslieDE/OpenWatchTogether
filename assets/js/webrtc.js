@@ -35,13 +35,23 @@
      Bitrate. mediasoup waehlt fuer jeden Zuschauer selbst und laufend die
      passende Stufe, je nachdem, was seine Leitung gerade traegt - wer knapp
      dran ist, bekommt ein kleineres, aber fluessiges Bild statt eines
-     ruckelnden grossen. Der Ton bleibt unangetastet, er kostet ohnehin
-     kaum etwas. */
+     ruckelnden grossen. */
   var VIDEO_ENCODINGS = [
     { scaleResolutionDownBy: 3,   maxBitrate: 1000000, maxFramerate: 15 },
     { scaleResolutionDownBy: 1.5, maxBitrate: 2500000, maxFramerate: 20 },
     { scaleResolutionDownBy: 1,   maxBitrate: 5000000, maxFramerate: 25 },
   ];
+
+  /* Ohne diese Hinweise verhandelt der Browser Opus auf eine sehr
+     genuegsame Sprachbitrate herunter - passend fuer Sprache, zu wenig
+     fuer Musik, die haeufig mituebertragen wird. 128 kbit/s Stereo mit
+     Fehlerkorrektur passt zur AAC-Zielbitrate der HLS-Ausgabe. */
+  var AUDIO_CODEC_OPTIONS = {
+    opusStereo: true,
+    opusFec: true,
+    opusDtx: false,
+    opusMaxAverageBitrate: 128000,
+  };
 
   function endpoint(room, peer, role, token) {
     var cfg = WT.api.settings().sfu || {};
@@ -253,9 +263,16 @@
      Aufloesung fast beliebig fuer eine ruckelfreie Bildrate, "text" macht
      es umgekehrt (fuer Text- oder Code-lastige Inhalte), "balanced" wiegt
      beides gegeneinander ab statt eine Seite komplett preiszugeben. */
+  /* degradationPreference immer "maintain-resolution": sonst darf der Browser
+     bei Bandbreitenproblemen die tatsaechlich gesendete Aufloesung mitten im
+     laufenden Stream aendern - das erzeugt beim VP8-Decoder in der HLS-
+     Pipeline kurzzeitige Artefakte (verzerrte Bloecke/Farbflaechen), bis das
+     naechste vollstaendige Keyframe durch ist. Mit fixer Aufloesung sinkt bei
+     Bandbreitenproblemen stattdessen nur die Framerate - kein Sprung, kein
+     Artefakt. */
   var QUALITY_PRESETS = {
-    motion:   { contentHint: "motion", degradationPreference: "maintain-framerate" },
-    balanced: { contentHint: "motion", degradationPreference: "balanced" },
+    motion:   { contentHint: "motion", degradationPreference: "maintain-resolution" },
+    balanced: { contentHint: "motion", degradationPreference: "maintain-resolution" },
     text:     { contentHint: "text",   degradationPreference: "maintain-resolution" }
   };
 
@@ -299,6 +316,8 @@
       if (track.kind === "video") {
         opts.encodings = VIDEO_ENCODINGS;
         opts.codecOptions = { videoGoogleStartBitrate: 3000 };
+      } else {
+        opts.codecOptions = AUDIO_CODEC_OPTIONS;
       }
       return sendTransport.produce(opts).then(function (producer) {
         if (track.kind === "video") {

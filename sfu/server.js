@@ -64,7 +64,10 @@ const ANNOUNCED_IP = process.env.WT_SFU_ANNOUNCED_IP || undefined;
 const SECRET       = process.env.WT_SFU_SECRET || '';
 
 const MEDIA_CODECS = [
-  { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },
+  {
+    kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2,
+    parameters: { useinbandfec: 1, stereo: 1, 'sprop-stereo': 1 },
+  },
   {
     kind: 'video', mimeType: 'video/VP8', clockRate: 90000,
     parameters: { 'x-google-start-bitrate': 3000 },
