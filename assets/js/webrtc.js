@@ -197,6 +197,13 @@
 
       ch.raw.onclose = function () {
         if (closed) return;
+        /* Ohne dieses close() bliebe der alte Transport (samt seiner
+           RTCPeerConnection und Decodern) im Hintergrund am Leben - jeder
+           weitere Verbindungsabriss haeufte so einen weiteren an, statt ihn
+           zu ersetzen. Bei einer langen Uebertragung mit mehreren
+           Netzhaengern haeuft sich dieser Speicher-/CPU-Verbrauch sichtbar
+           auf, siehe dieselbe Begruendung bei der oeffentlichen close(). */
+        if (recvTransport) { try { recvTransport.close(); } catch (e) { /* schon zu */ } }
         recvTransport = null;
         clearTracks();
         scheduleRetry();
@@ -342,7 +349,13 @@
 
         ch.raw.onclose = function () {
           if (closed) return;
+          /* Wie beim Zuschauer (watch()): ohne dieses close() blieben der
+             alte Transport und seine Producer (also auch der Simulcast-
+             Encoder) im Hintergrund aktiv - jeder weitere Verbindungsabriss
+             haeufte so einen weiteren an, statt ihn zu ersetzen. */
+          if (sendTransport) { try { sendTransport.close(); } catch (e) { /* schon zu */ } }
           sendTransport = null;
+          videoProducer = null;
           scheduleRetry();
         };
         ch.raw.onerror = function () { /* "close" kuemmert sich darum */ };
