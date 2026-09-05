@@ -2018,9 +2018,12 @@
     }
     closeVeil(el.veilRoom);
 
-    var saved = stored(STORE_NAME) || "";
-    if (saved) { S.me.name = saved; openConnection(); }
-    else askName(false);
+    /* Immer fragen, auch mit gespeichertem Namen: der Klick auf "Speichern"
+       ist die einzige Nutzergeste vor dem Verbinden - ohne sie haelt der
+       Browser das spaetere autoplay() des Videos fuer unangefordert und
+       blockt es (siehe toast.blocked), obwohl der Name laengst feststeht. */
+    S.me.name = stored(STORE_NAME) || "";
+    askName(false);
   }
 
   el.btnCopyLink.addEventListener("click", function () {
