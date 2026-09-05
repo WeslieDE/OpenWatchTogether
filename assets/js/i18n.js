@@ -56,7 +56,7 @@
       "set.go.label":      "Bereit-Modus",
       "set.go.hint":       "Wechselt das Video, wartet der Raum, bis alle auf „Bereit“ gedrückt haben. Während der Wiedergabe hat das Zeichen keine Wirkung – wer es zurückzieht, hält erst das nächste Video auf.",
       "set.stream.label":  "HLS-Stream",
-      "set.stream.hint":   "Zeigt, was gerade im Raum läuft – für einen Fernseher, Chromecast oder OBS, ganz ohne Browser.",
+      "set.stream.hint":   "HLS URL für Internet fähige Media Player.",
       "set.marks.title":   "Vorspann und Abspann",
       "set.marks.lead":    "Beim Wechsel auf ein anderes Video startet es hinter dem Vorspann und gilt als durch, sobald der Abspann anfängt. Leere Felder heißen: ganz von vorn bis ganz zum Schluss.",
       "set.opening.label": "Ende des Vorspanns",
