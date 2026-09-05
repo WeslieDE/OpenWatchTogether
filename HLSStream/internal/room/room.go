@@ -209,6 +209,8 @@ func (r *Room) handleHub(ev hub.Event) {
 		r.liveOn = ev.Welcome.Live.On
 		if !r.liveOn {
 			r.liveReadyOK = false
+		} else {
+			r.assertConnected()
 		}
 		r.assertGo()
 		r.assertReady()
@@ -241,6 +243,7 @@ func (r *Room) handleHub(ev hub.Event) {
 		if r.liveOn {
 			r.liveEpoch++
 			r.liveReadyOK = false
+			r.assertConnected()
 			epoch := r.liveEpoch
 			go r.startLive(epoch)
 		} else {
@@ -264,6 +267,20 @@ func (r *Room) assertGo() {
 			On bool `json:"on"`
 		}{true})
 	}
+}
+
+// assertConnected meldet dem Hub, dass HLSStream als "verbunden" gilt -
+// anders als bei einem Browser (siehe "live-status" in app.js) haengt das
+// hier nicht an einer eigenen SFU-Verbindung: HLSStream zieht sich die
+// Bildschirmuebertragung erst bei Bedarf ueber sfuclient, ist als Dienst aber
+// so gut wie immer erreichbar. Ohne diese Meldung bliebe sein Punkt in der
+// Zuschauerliste (assets/js/app.js, renderViewers()) waehrend jeder
+// Uebertragung faelschlich rot, obwohl von ihm keine echte Unterbrechung
+// droht wie bei einem Browser-Tab.
+func (r *Room) assertConnected() {
+	r.hubC.Send("live-status", struct {
+		Connected bool `json:"connected"`
+	}{true})
 }
 
 // assertReady meldet dem Hub, dass das gerade laufende Video "im Puffer"
