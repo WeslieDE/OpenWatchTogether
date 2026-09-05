@@ -44,13 +44,13 @@
 
   /* Ohne diese Hinweise verhandelt der Browser Opus auf eine sehr
      genuegsame Sprachbitrate herunter - passend fuer Sprache, zu wenig
-     fuer Musik, die haeufig mituebertragen wird. 128 kbit/s Stereo mit
+     fuer Musik, die haeufig mituebertragen wird. 320 kbit/s Stereo mit
      Fehlerkorrektur passt zur AAC-Zielbitrate der HLS-Ausgabe. */
   var AUDIO_CODEC_OPTIONS = {
     opusStereo: true,
     opusFec: true,
     opusDtx: false,
-    opusMaxAverageBitrate: 128000,
+    opusMaxAverageBitrate: 320000,
   };
 
   function endpoint(room, peer, role, token) {
