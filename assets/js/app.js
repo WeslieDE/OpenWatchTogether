@@ -2773,10 +2773,31 @@
 
   /* Lebenszeichen. Es traegt nichts bei sich und geht auch dann raus, wenn
      gar kein Video anliegt - allein davon haengt ab, ob der Raum mich noch
-     fuer anwesend haelt. */
-  global.setInterval(function () {
-    if (S.joined) send("ping", {});
-  }, net.PING_MS);
+     fuer anwesend haelt. Der Taktgeber sitzt in einem Web Worker: Browser
+     drosseln setInterval im Hauptthread eines verdeckten Tabs nach einer
+     Weile auf nur noch einmal pro Minute - das reisst das knappe
+     Zeitfenster, das der Server dafuer einraeumt (Hub::TIMEOUT). Worker
+     unterliegen dieser Drosselung nicht. Klappt der Worker aus
+     irgendeinem Grund nicht, faellt es zurueck auf den Haupt-Timer. */
+  (function () {
+    function pingNow() {
+      if (S.joined) send("ping", {});
+    }
+    var worker = null;
+    try {
+      worker = new global.Worker("assets/js/pingworker.js");
+      worker.onmessage = function (e) {
+        if (e.data && e.data.type === "tick") pingNow();
+      };
+      worker.onerror = function () {
+        worker = null;
+        global.setInterval(pingNow, net.PING_MS);
+      };
+      worker.postMessage({ type: "start", ms: net.PING_MS });
+    } catch (e) {
+      global.setInterval(pingNow, net.PING_MS);
+    }
+  })();
 
   /* --------------------------------------------------------------- Start */
 

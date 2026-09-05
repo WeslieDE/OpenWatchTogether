@@ -49,7 +49,7 @@ func RenderHold(ffmpegPath, pausedImage string) ([]byte, error) {
 		"-profile:v", "main", "-level", "3.1", "-pix_fmt", "yuv420p",
 		"-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
 		"-b:v", "2500k", "-maxrate", "2500k", "-bufsize", "5000k",
-		"-c:a", "aac", "-b:a", "128k", "-ar", strconv.Itoa(SampleRate), "-ac", strconv.Itoa(Channels),
+		"-c:a", "aac", "-b:a", "320k", "-ar", strconv.Itoa(SampleRate), "-ac", strconv.Itoa(Channels),
 		"-f", "mpegts",
 		out,
 	}
