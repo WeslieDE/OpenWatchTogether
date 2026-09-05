@@ -825,6 +825,7 @@
   var liveSession = null;     /* laufende SFU-Verbindung, Sender oder Zuschauer */
   var liveTokenWaiter = null; /* wartet auf die Antwort von "live-start" */
   var livePausedAt = 0;       /* Stelle des Warteschlangen-Videos, falls eines lief */
+  var liveWatchStart = 0;     /* seit wann ich selbst zuschaue - fuer die Zeitanzeige */
 
   var QUALITY_MODES = ["motion", "balanced", "text"];
   /* Raumuebergreifend gemerkt (eigenes Geraet, kein Server-Zustand) - wer
@@ -914,6 +915,7 @@
       });
 
       S.live = { on: true, byId: S.me.id };
+      liveWatchStart = Date.now();
       renderLiveUi();
 
       liveSession = webrtc.broadcast({
@@ -942,6 +944,7 @@
     surface.pause();
     el.stageEmpty.hidden = true;
     blocked = false;
+    liveWatchStart = Date.now();
 
     liveSession = webrtc.watch({
       room: S.room, peer: S.me.id,
@@ -996,6 +999,7 @@
       el.stageEmpty.hidden = false;
     }
     livePausedAt = 0;
+    liveWatchStart = 0;
     updatePlayUi();
     updateScrub();
   }
@@ -1453,6 +1457,19 @@
   }
 
   /* ------------------------------------------------------------- Rendering */
+
+  /* Waehrend eines Livestreams gibt es weder Position noch Laenge im Sinne
+     der Warteschlange (surface.length/.position gehoeren zu einem geladenen
+     Video, nicht zum MediaStream des Sender-Bilds) - trotzdem soll die
+     Anzeige nicht bei "0:00" stehenbleiben. Sie zaehlt stattdessen, wie
+     lange man selbst schon zuschaut (Sender eingeschlossen). */
+  function updateLiveScrub() {
+    var secs = liveWatchStart ? (Date.now() - liveWatchStart) / 1000 : 0;
+    el.tCur.textContent = tc(secs);
+    el.tDur.textContent = "";
+    el.scrubFill.style.width = "0%";
+    el.scrubKnob.style.left = "0%";
+  }
 
   function updateScrub() {
     var len = surface.length || 0;
@@ -2763,6 +2780,7 @@
     endingTick();
     updateViewerPositions();
     renderPeerTicks();
+    if (isLive()) updateLiveScrub();
   }, 250);
 
   /* Eigene Position melden. */
