@@ -31,6 +31,9 @@
  *     produced            Antwort auf produce
  *     consumer-created    Antwort auf consume
  *     producer-closed     die ganze Uebertragung ist vorbei
+ *     producer-gone       nur dieser eine Producer ist weg (siehe Gnadenfrist
+ *                         unten) - im Unterschied zu producer-closed laeuft
+ *                         die Uebertragung insgesamt weiter
  *     error                etwas ist abgelehnt worden
  *
  *   Client an Server
@@ -123,14 +126,23 @@ async function roomOf(slug) {
 
   await ensureWorker();
   const router = await worker.createRouter({ mediaCodecs: MEDIA_CODECS });
-  room = { router, producerPeer: null, producers: new Map(), conns: new Set() };
+  room = {
+    router, producerPeer: null, producers: new Map(), conns: new Set(),
+    /* Siehe scheduleProducerGrace(): die Verbindung des Senders, die gerade
+       auf ein moegliches Wiederandocken wartet, statt schon als beendet zu
+       gelten. */
+    pendingProducerConn: null, graceTimer: null,
+  };
   rooms.set(slug, room);
   return room;
 }
 
 /** Nichts mehr los im Raum: der Router geht, sonst haeuft sich das an. */
 function maybeForgetRoom(slug, room) {
-  if (room.conns.size > 0) return;
+  /* Waehrend der Sender in der Gnadenfrist steckt, sieht der Raum von aussen
+     leer aus (seine WS ist ja schon zu) - der Router darf trotzdem nicht
+     weg, sonst reisst das Wiederandocken den Transport unter sich weg. */
+  if (room.conns.size > 0 || room.pendingProducerConn) return;
   room.router.close();
   rooms.delete(slug);
 }
@@ -199,15 +211,79 @@ async function handleConnection(ws, request) {
   }
 }
 
+/* Wie lange der Transport des Senders nach einem Signalisierungsabriss noch
+   steht, bevor er endgueltig als beendet gilt. Ein Hintergrund-Tab kann
+   Chrome so weit drosseln, dass die /sfu-ws-Verbindung kurz abreisst, obwohl
+   der Sender (siehe webrtc.js, RETRY_MAX) gleich von selbst mit frischem
+   Transport wiederkommt - ohne diese Frist waere jeder solche Ruckler ein
+   sofortiges "producer-closed" fuer alle Zuschauer samt kompletter
+   Neuverhandlung, statt eines kurzen Einfrierens. */
+const PRODUCER_GRACE_MS = 25000;
+
 function onClose(room, conn) {
   conn.consumers.forEach((c) => c.close());
-  conn.transports.forEach((t) => t.close());
   room.conns.delete(conn);
 
   if (conn.role === 'produce' && room.producerPeer === conn.peer) {
-    stopProducing(room);
+    scheduleProducerGrace(room, conn);
+  } else {
+    conn.transports.forEach((t) => t.close());
   }
   maybeForgetRoom(conn.slug, room);
+}
+
+/** Haelt den Transport des Senders nach einem Signalisierungsabriss noch
+    eine Weile am Leben, statt ihn sofort zu schliessen - siehe
+    PRODUCER_GRACE_MS. Kommt niemand rechtzeitig zurueck, faellt es unten auf
+    das alte Verhalten zurueck (Transport zu, Zuschauer bekommen Bescheid). */
+function scheduleProducerGrace(room, conn) {
+  clearProducerGrace(room);
+  room.pendingProducerConn = conn;
+  room.graceTimer = setTimeout(() => {
+    room.pendingProducerConn = null;
+    room.graceTimer = null;
+    conn.transports.forEach((t) => t.close());
+  }, PRODUCER_GRACE_MS);
+}
+
+function clearProducerGrace(room) {
+  if (room.graceTimer) {
+    clearTimeout(room.graceTimer);
+    room.graceTimer = null;
+  }
+  room.pendingProducerConn = null;
+}
+
+/** Die Gnadenfrist ist ueberholt, ohne dass sie abgelaufen waere - entweder
+    weil derselbe Sender rechtzeitig mit frischem Transport wiederkam
+    (Zuschauer bekommen nur "producer-gone" statt "producer-closed", siehe
+    dort), oder weil ein anderer Peer den Takt uebernimmt. Der alte, verwaiste
+    Transport wird in beiden Faellen weggeraeumt. */
+function discardPendingProducer(room) {
+  const stale = room.pendingProducerConn;
+  clearProducerGrace(room);
+  if (stale) stale.transports.forEach((t) => t.close());
+}
+
+/** Derselbe Sender ist mit frischem Transport zurueck, bevor die Gnadenfrist
+    ablief: der alte Producer wird ohne "producer-closed" abgeraeumt, die
+    Zuschauer bekommen stattdessen gezielt "producer-gone" fuer genau die
+    Producer-Kennungen, die gerade wegfallen - ihre Verbindung insgesamt
+    bleibt bestehen, nur der eine Track wird ersetzt. */
+function finalizeStaleProducerConn(room) {
+  const stale = room.pendingProducerConn;
+  clearProducerGrace(room);
+  if (!stale) return;
+
+  const staleIds = Array.from(room.producers.keys());
+  room.producers.clear();
+  stale.transports.forEach((t) => t.close());
+
+  staleIds.forEach((id) => {
+    room.conns.forEach((c) => {
+      if (c.role === 'consume') send(c.ws, 'producer-gone', { producerId: id });
+    });
+  });
 }
 
 /** Der Sender ist weg - ob gewollt beendet oder weil die Leitung abriss.
@@ -301,6 +377,19 @@ async function onMessage(room, conn, raw) {
         break;
       }
 
+      /* Der Sender beendet bewusst, kein blosser Signalisierungsabriss -
+         siehe close() in webrtc.js. Ohne dieses Signal koennte der Server
+         den anschliessenden ws-Abbau nicht von einem Netzhaenger unterscheiden
+         und wuerde die Gnadenfrist abwarten, bevor die Zuschauer Bescheid
+         bekommen (siehe scheduleProducerGrace()). */
+      case 'stop': {
+        if (conn.role === 'produce' && room.producerPeer === conn.peer) {
+          discardPendingProducer(room);
+          stopProducing(room);
+        }
+        break;
+      }
+
       /* Nur der aktuelle Sender darf produzieren - eine Bildschirmuebertragung
          hat genau eine Quelle, wenn auch aus bis zu zwei Producern (Bild und
          Ton). Eine neue Anmeldung eines anderen Peers loest die vorige ab,
@@ -311,7 +400,12 @@ async function onMessage(room, conn, raw) {
         const transport = conn.transports.get(String(d.transportId));
         if (!transport) break;
 
-        if (room.producerPeer && room.producerPeer !== conn.peer) {
+        if (room.producerPeer === conn.peer && room.pendingProducerConn) {
+          /* Derselbe Sender wie zuvor, nur mit frischem Transport nach einem
+             Signalisierungsabriss - kein richtiger Wechsel, siehe dort. */
+          finalizeStaleProducerConn(room);
+        } else if (room.producerPeer && room.producerPeer !== conn.peer) {
+          discardPendingProducer(room);
           stopProducing(room);
         }
 

@@ -145,13 +145,33 @@
     var stream = new global.MediaStream();
     var known = {};             /* producerId => schon angefragt/konsumiert */
     var pending = [];           /* producerId, die vor dem Transport ankamen */
+    var consumers = {};         /* producerId => Consumer, fuer den gezielten Abbau einzelner */
 
     opts.onStream(stream);
 
     function clearTracks() {
       stream.getTracks().forEach(function (t) { stream.removeTrack(t); });
+      Object.keys(consumers).forEach(function (pid) {
+        try { consumers[pid].close(); } catch (e) { /* schon zu */ }
+      });
       known = {};
       pending = [];
+      consumers = {};
+    }
+
+    /* Ersetzt einen einzelnen, wortlos abgeloesten Producer (siehe
+       "producer-gone" in sfu/server.js: der Sender ist bei einem blossen
+       Signalisierungsabriss mit frischem Transport wiedergekommen, statt die
+       ganze Uebertragung zu beenden) - im Unterschied zu clearTracks() bleibt
+       hier alles andere unberuehrt. */
+    function dropProducer(producerId) {
+      var consumer = consumers[producerId];
+      if (consumer) {
+        try { stream.removeTrack(consumer.track); } catch (e) { /* schon weg */ }
+        try { consumer.close(); } catch (e) { /* schon zu */ }
+        delete consumers[producerId];
+      }
+      delete known[producerId];
     }
 
     function scheduleRetry() {
@@ -180,6 +200,7 @@
           id: data.id, producerId: data.producerId, kind: data.kind, rtpParameters: data.rtpParameters
         });
       }).then(function (consumer) {
+        consumers[producerId] = consumer;
         stream.addTrack(consumer.track);
         ch.send("resume-consumer", { consumerId: consumer.id });
       }).catch(function () { /* der naechste Neuaufbau holt es nach */ });
@@ -193,6 +214,7 @@
       ch.setPush(function (type, data) {
         if (type === "new-producer") consume(data.producerId);
         else if (type === "producer-closed") clearTracks();
+        else if (type === "producer-gone") dropProducer(data.producerId);
       });
 
       ch.raw.onclose = function () {
@@ -409,7 +431,12 @@
         if (timer) { global.clearTimeout(timer); timer = 0; }
         if (sendTransport) { try { sendTransport.close(); } catch (e) { /* zu */ } }
         sendTransport = null;
-        if (ch) ch.close();
+        /* Sagt dem SFU, dass hier bewusst Schluss ist - sonst wartet er
+           erst noch die Gnadenfrist fuer einen blossen Signalisierungsabriss
+           ab (siehe scheduleProducerGrace() in sfu/server.js), und die
+           Zuschauer sehen das letzte Bild bis zu 25s laenger eingefroren,
+           als es fuer ein absichtliches Beenden noetig waere. */
+        if (ch) { ch.send("stop", {}); ch.close(); }
         ch = null;
       },
       setQuality: function (mode) {
