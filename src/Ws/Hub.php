@@ -437,6 +437,15 @@ final class Hub
      * Netz meldet sich nicht ab: die Leitung sieht dann noch eine ganze Weile
      * offen aus, waehrend der Raum auf jemanden wartet, der laengst nicht mehr
      * da ist. Also zaehlt hier nicht die Leitung, sondern das letzte Wort.
+     *
+     * Der Sender einer laufenden Bildschirmuebertragung ist davon ausgenommen:
+     * ein Hintergrund-Tab kann von Chrome so weit gedrosselt werden, dass
+     * selbst der Ping aus dem Web Worker (siehe pingworker.js) nicht mehr
+     * durchkommt, obwohl die eigentliche SFU-Verbindung technisch weiterlaeuft
+     * - der offene Bildschirm reicht in diesem Fall selbst als Lebenszeichen.
+     * Ein wirklich totes Netz faellt trotzdem auf: dann schliesst die
+     * Leitung selbst (siehe onClose in ws/server.php), unabhaengig von
+     * diesem Timeout.
      */
     public function tickTimeouts(): void
     {
@@ -445,6 +454,9 @@ final class Hub
         foreach ($this->rooms as $slug => $room) {
             foreach ($room->peers as $id => $peer) {
                 if ((float)$peer['seen'] >= $limit) {
+                    continue;
+                }
+                if ($room->live && $room->liveBy === $id) {
                     continue;
                 }
                 $conn = $peer['conn'];
