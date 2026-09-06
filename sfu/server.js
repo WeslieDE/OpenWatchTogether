@@ -377,6 +377,13 @@ async function onMessage(room, conn, raw) {
         break;
       }
 
+      /* Reines Lebenszeichen (siehe KEEPALIVE_MS in webrtc.js) - haelt nur
+         die /sfu-ws-Verbindung durch einen davorliegenden Proxy hindurch am
+         Leben, wenn sonst laenger nichts zu signalisieren ist. Der Raum
+         braucht darauf keine eigene Antwort, das blosse Eintreffen reicht. */
+      case 'ping':
+        break;
+
       /* Der Sender beendet bewusst, kein blosser Signalisierungsabriss -
          siehe close() in webrtc.js. Ohne dieses Signal koennte der Server
          den anschliessenden ws-Abbau nicht von einem Netzhaenger unterscheiden

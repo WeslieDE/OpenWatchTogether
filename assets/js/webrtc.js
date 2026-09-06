@@ -31,6 +31,75 @@
   var RETRY_MIN = 1000;
   var RETRY_MAX = 15000;
 
+  /* Wie oft der Signalisierungskanal ein Lebenszeichen ueber die /sfu-ws-
+     Verbindung schickt. Nach der Verhandlung (rtp-capabilities, Transport,
+     produce/consume) faellt darueber oft minutenlang kein Byte mehr an -
+     lange genug Leerlauf, dass der davorliegende Apache-Proxy die WS ohne
+     jede Rueckmeldung als tot betrachtet und kappt (siehe ProxyPass in
+     docker/watch-together.conf), obwohl Bild und Ton laengst direkt zum SFU
+     laufen und davon unberuehrt blieben. */
+  var KEEPALIVE_MS = 20000;
+
+  /* -------------------------------------------------------------- Taktgeber */
+  /* Fuer den Keepalive und den wachsenden Reconnect-Abstand: derselbe Grund
+     wie beim Haupt-Websocket (siehe pingworker.js) - ein verdeckter Tab
+     drosselt setTimeout/setInterval im Hauptthread nach einer Weile auf nur
+     noch einmal pro Minute. Besonders tueckisch hier: genau in dem Moment,
+     in dem ein Reconnect noetig wird, ist der bisherige Transport (die
+     RTCPeerConnection) schon geschlossen (siehe ch.raw.onclose unten) - die
+     sonst uebliche Ausnahme, die Chrome Seiten mit aktiver WebRTC-Verbindung
+     von dieser Drosselung gewaehrt, greift also ausgerechnet waehrend der
+     Wartezeit auf den naechsten Versuch nicht mehr. Ein Worker unterliegt
+     der Drosselung nie; klappt er aus irgendeinem Grund nicht, faellt jeder
+     einzelne Aufruf auf den normalen Haupt-Timer zurueck. */
+  var clock = (function () {
+    var worker = null;
+    var seq = 0;
+    var pending = {};  /* id => {cb, once}, nur ueber den Worker geplant */
+    var native = {};   /* id => Handle von setTimeout/setInterval, Fallback */
+
+    try {
+      worker = new global.Worker("assets/js/webrtc-worker.js");
+      worker.onmessage = function (e) {
+        var id = e.data && e.data.id;
+        var entry = pending[id];
+        if (!entry) return;
+        if (entry.once) delete pending[id];
+        entry.cb();
+      };
+      worker.onerror = function () { worker = null; };
+    } catch (e) { worker = null; }
+
+    function schedule(kind, cb, ms, once) {
+      var id = "c" + (++seq);
+      if (worker) {
+        pending[id] = { cb: cb, once: once };
+        worker.postMessage({ type: kind, id: id, ms: ms });
+      } else if (once) {
+        native[id] = global.setTimeout(cb, ms);
+      } else {
+        native[id] = global.setInterval(cb, ms);
+      }
+      return id;
+    }
+
+    return {
+      setTimeout: function (cb, ms) { return schedule("timeout", cb, ms, true); },
+      setInterval: function (cb, ms) { return schedule("interval", cb, ms, false); },
+      clear: function (id) {
+        if (id == null) return;
+        if (worker) {
+          delete pending[id];
+          worker.postMessage({ type: "clear", id: id });
+        } else if (id in native) {
+          global.clearTimeout(native[id]);
+          global.clearInterval(native[id]);
+          delete native[id];
+        }
+      }
+    };
+  })();
+
   /* Drei Qualitaetsstufen fuer das Bild, gestaffelt in Aufloesung und
      Bitrate. mediasoup waehlt fuer jeden Zuschauer selbst und laufend die
      passende Stufe, je nachdem, was seine Leitung gerade traegt - wer knapp
@@ -89,6 +158,19 @@
     var byProducer = {};    /* producerId => Resolver fuer consumer-created */
     var push = null;
 
+    function send(type, data) {
+      if (sock.readyState !== 1) return;
+      try { sock.send(JSON.stringify({ type: type, data: data || {} })); } catch (e) { /* zu */ }
+    }
+
+    /* Siehe KEEPALIVE_MS oben. Ueber sock.close() statt ueber die oeffent-
+       liche close() dieses Kanals abgeraeumt, weil der Kanal genauso gut
+       von aussen wegbrechen kann (Netzhaenger, Proxy-Timeout) - dann muss
+       der Takt trotzdem aufhoeren, nicht erst beim naechsten expliziten
+       close(). */
+    var keepalive = clock.setInterval(function () { send("ping", {}); }, KEEPALIVE_MS);
+    sock.addEventListener("close", function () { clock.clear(keepalive); });
+
     sock.onmessage = function (e) {
       var msg = null;
       try { msg = JSON.parse(e.data); } catch (err) { return; }
@@ -119,10 +201,7 @@
         return new Promise(function (resolve) { byProducer[producerId] = resolve; });
       },
       setPush: function (fn) { push = fn; },
-      send: function (type, data) {
-        if (sock.readyState !== 1) return;
-        try { sock.send(JSON.stringify({ type: type, data: data || {} })); } catch (e) { /* zu */ }
-      },
+      send: send,
       close: function () { try { sock.close(); } catch (e) { /* schon zu */ } }
     };
   }
@@ -177,7 +256,7 @@
     function scheduleRetry() {
       if (closed || timer) return;
       if (opts.onState) opts.onState("lost");
-      timer = global.setTimeout(function () { timer = 0; open(); }, wait);
+      timer = clock.setTimeout(function () { timer = 0; open(); }, wait);
       wait = Math.min(RETRY_MAX, Math.round(wait * 1.8));
     }
 
@@ -267,7 +346,7 @@
     return {
       close: function () {
         closed = true;
-        if (timer) { global.clearTimeout(timer); timer = 0; }
+        if (timer) { clock.clear(timer); timer = 0; }
         if (recvTransport) { try { recvTransport.close(); } catch (e) { /* zu */ } }
         recvTransport = null;
         clearTracks();
@@ -319,7 +398,7 @@
     function scheduleRetry() {
       if (closed || timer) return;
       if (opts.onState) opts.onState("lost");
-      timer = global.setTimeout(function () { timer = 0; open(); }, wait);
+      timer = clock.setTimeout(function () { timer = 0; open(); }, wait);
       wait = Math.min(RETRY_MAX, Math.round(wait * 1.8));
     }
 
@@ -428,7 +507,7 @@
     return {
       close: function () {
         closed = true;
-        if (timer) { global.clearTimeout(timer); timer = 0; }
+        if (timer) { clock.clear(timer); timer = 0; }
         if (sendTransport) { try { sendTransport.close(); } catch (e) { /* zu */ } }
         sendTransport = null;
         /* Sagt dem SFU, dass hier bewusst Schluss ist - sonst wartet er
