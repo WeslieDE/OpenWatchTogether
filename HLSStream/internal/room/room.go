@@ -210,7 +210,14 @@ func (r *Room) handleHub(ev hub.Event) {
 		if !r.liveOn {
 			r.liveReadyOK = false
 		} else {
-			r.assertConnected()
+			// Die Uebertragung lief schon, bevor HLSStream dem Raum
+			// beitrat - ohne diesen Aufruf saehe assertConnected() zwar
+			// "verbunden" aus, aber der SFU-Handshake liefe nie an, und
+			// desired() bliebe fuer immer bei "idle" (Standbild) haengen,
+			// weil r.liveReadyOK nie true wird. Beim gewoehnlichen Weg
+			// (Uebertragung startet, waehrend HLSStream schon im Raum
+			// ist) uebernimmt das der "live"-Fall unten.
+			r.startLiveHandshake()
 		}
 		r.assertGo()
 		r.assertReady()
@@ -241,11 +248,7 @@ func (r *Room) handleHub(ev hub.Event) {
 	case "live":
 		r.liveOn = ev.Live.On
 		if r.liveOn {
-			r.liveEpoch++
-			r.liveReadyOK = false
-			r.assertConnected()
-			epoch := r.liveEpoch
-			go r.startLive(epoch)
+			r.startLiveHandshake()
 		} else {
 			r.liveReadyOK = false
 			if r.liveSession != nil {
@@ -446,6 +449,21 @@ func (r *Room) handleSourceExit(exit sourceExit) {
 }
 
 /* -------------------------------------------------------- Live-Aufbau (SFU) */
+
+// startLiveHandshake stoesst den SFU-Consume-Aufbau an - sowohl wenn eine
+// Uebertragung neu beginnt (Hub-Ereignis "live"), als auch wenn HLSStream
+// einem Raum beitritt, in dem schon gesendet wird (Hub-Ereignis "welcome"
+// mit live.on=true): das SFU meldet jedem neu verbundenen Consumer laufende
+// Producer von sich aus (siehe handleConnection() in sfu/server.js), es
+// fehlt in diesem zweiten Fall also nur der Anstoss von hier aus, ueberhaupt
+// eine Consume-Verbindung zum SFU aufzubauen.
+func (r *Room) startLiveHandshake() {
+	r.liveEpoch++
+	r.liveReadyOK = false
+	r.assertConnected()
+	epoch := r.liveEpoch
+	go r.startLive(epoch)
+}
 
 // startLive laeuft in einer eigenen Goroutine, weil der Handshake mit dem SFU
 // mehrere Netzwerk-Umlaeufe braucht - die Hauptschleife darf dabei nicht
