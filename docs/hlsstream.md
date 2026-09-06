@@ -214,7 +214,7 @@ ausgelegt:
 | Bildrate | 24fps, fest (`fps`-Filter für alle drei Quellarten) |
 | Video | H.264, `profile main`, `level 3.1`, `yuv420p` |
 | GOP | 48 Bilder = exakt 2 Sekunden, kein zusätzlicher Scene-Cut-Keyframe (`sc_threshold 0`) — jedes Segment beginnt exakt auf einem Keyframe |
-| Ton | AAC, 2 Kanäle, 48kHz, 128kbps |
+| Ton | AAC, 2 Kanäle, 48kHz, 320kbps |
 | Segmente | MPEG-TS, 2 Sekunden, Fenster von 8 Segmenten (~16s) |
 
 Das ist bewusst *praktisch* latenzarm (kurze, aber normale HLS-Segmente)
