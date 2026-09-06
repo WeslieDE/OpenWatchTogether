@@ -881,9 +881,15 @@
        gewoehnliche Leitung tragen kann. Das allein macht das Bild schon
        ruckelig, noch bevor irgendein Zuschauer mit knapper Bandbreite dazu-
        kommt. */
+    /* Ohne diese drei Sperren greift der Browser bei "audio: true" auf die
+       Voreinstellungen fuer ein Sprachgespraech zurueck - Echo-Unterdrueckung,
+       Rauschfilter und automatische Verstaerkung. Die verbiegen Musik und
+       Spielgeraeusche (Kompression, Dynamikverlust, herausgefilterte
+       Frequenzen), obwohl bei einer Bildschirmuebertragung gar kein Echo
+       eines eigenen Mikrofons anliegt, das unterdrueckt werden muesste. */
     global.navigator.mediaDevices.getDisplayMedia({
       video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 25, max: 25 } },
-      audio: true
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     }).then(function (stream) {
       liveStream = stream;
 
