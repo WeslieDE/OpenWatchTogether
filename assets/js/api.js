@@ -185,6 +185,7 @@
     room:   function (slug) { return post("room", { room: slug }); },
     queue:  function (slug) { return get("queue", { room: slug }); },
     remove: function (slug, id) { return post("remove", { room: slug, id: id }); },
+    clear:  function (slug) { return post("clear", { room: slug }); },
     upload: upload,
     url: url
   };

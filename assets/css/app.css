@@ -169,6 +169,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 }
 .btn svg { width: 17px; height: 17px; }
 .btn:active { transform: scale(.985); }
+.btn:disabled { opacity: .45; cursor: default; }
 
 .btn-accent { background: var(--accent); color: var(--accent-on); }
 .btn-accent:hover { background: var(--accent-hi); }
@@ -178,6 +179,9 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
 
 .btn-ghost { color: var(--text-2); }
 .btn-ghost:hover { background: var(--surface-3); color: var(--text); }
+
+.btn-danger { color: var(--bad); border-color: var(--bad); }
+.btn-danger:hover { background: var(--bad-soft); }
 
 /* Laeuft die Uebertragung schon, wird aus dem Startknopf ein Beenden-Knopf. */
 #btnLive.is-live { background: var(--bad-soft); color: var(--bad); border-color: transparent; }

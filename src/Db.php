@@ -243,6 +243,15 @@ final class Db
         return true;
     }
 
+    /** Loescht die gesamte Warteschlange, jeweils samt Video und Vorschaubild -
+        wie remove(), nur fuer alle Eintraege auf einmal. */
+    public function clear(): void
+    {
+        foreach ($this->rows() as $row) {
+            $this->remove((string)$row['id']);
+        }
+    }
+
     /** Namen nachziehen, wenn sich jemand umbenennt. */
     public function rename(string $peerId, string $name): void
     {

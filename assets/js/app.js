@@ -105,6 +105,7 @@
     setOpening: $("setOpening"), setEnding: $("setEnding"),
     errSettings: $("errSettings"), btnSettings: $("btnSettings"),
     btnSetClose: $("btnSetClose"), btnSetCancel: $("btnSetCancel"),
+    btnClearQueue: $("btnClearQueue"),
 
     veilUpload: $("veilUpload"), upPick: $("upPick"), upRun: $("upRun"), upDone: $("upDone"),
     drop: $("drop"), inpFile: $("inpFile"), errFile: $("errFile"),
@@ -1686,6 +1687,30 @@
     });
   }
 
+  /* Wie removeFromQueue(), nur fuer die gesamte Warteschlange auf einmal -
+     samt aller Dateien, fuer alle im Raum. */
+  function clearQueue() {
+    if (!S.queue.length || !global.confirm(t("set.clear.confirm"))) return;
+
+    var hadCurrent = !!S.current;
+    S.queue = [];
+    renderQueue();
+    logAdd("log.clear", "", logWho(S.me.id));
+
+    if (hadCurrent) {
+      takeControl(true);
+      loadItem(null);
+    }
+    toast(t("toast.cleared"), "i-trash");
+
+    api.clear(S.room).then(function () {
+      send("changed", {});
+    }, function () {
+      toast(t("toast.failed"));
+      refreshQueue();
+    });
+  }
+
   function refreshQueue() {
     api.queue(S.room).then(function (res) {
       applyQueue(res.queue || []);
@@ -2209,6 +2234,7 @@
     el.setOpening.value = spanText(S.settings.opening);
     el.setEnding.value  = spanText(S.settings.ending);
     el.errSettings.hidden = true;
+    el.btnClearQueue.disabled = !S.queue.length;
     openVeil(el.veilSettings, el.setKeep);
   }
 
@@ -2220,6 +2246,7 @@
   el.btnCopyStreamUrl.addEventListener("click", function () {
     copyToClipboard(el.setStreamUrl.value);
   });
+  el.btnClearQueue.addEventListener("click", clearQueue);
 
   doc.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && !el.veilSettings.hidden) closeSettings();

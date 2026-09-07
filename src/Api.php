@@ -10,6 +10,7 @@
  *   do=upload-finish   fertig: umbenennen, Laufzeit, Vorschaubild, eintragen
  *   do=upload-abort    Uebertragung wegwerfen
  *   do=remove          Video aus der Warteschlange loeschen, samt Datei
+ *   do=clear           Die gesamte Warteschlange leeren, samt aller Dateien
  *   do=poster          Vorschaubild ausliefern
  *
  * Die Videos selbst laufen nicht mehr hierueber: die Warteschlange nennt dem
@@ -39,6 +40,7 @@ final class Api
                 case 'upload-finish': self::uploadFinish();break;
                 case 'upload-abort':  self::uploadAbort(); break;
                 case 'remove':        self::remove();      break;
+                case 'clear':         self::clear();       break;
                 case 'poster':        self::poster();      break;
                 default:
                     throw new ApiError('unknown', 'Unbekannter Aufruf.', 404);
@@ -174,6 +176,18 @@ final class Api
         Rooms::touch($slug);
 
         self::json(['ok' => $gone]);
+    }
+
+    private static function clear(): void
+    {
+        $slug = self::slug();
+        if (!Rooms::exists($slug)) {
+            throw new ApiError('room', 'Diesen Raum gibt es nicht.', 404);
+        }
+        Db::of($slug)->clear();
+        Rooms::touch($slug);
+
+        self::json(['ok' => true]);
     }
 
     /* ------------------------------------------------------- Auslieferung -- */
