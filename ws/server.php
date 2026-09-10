@@ -15,6 +15,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use tk\weslie\WatchTogether\Cleanup;
 use tk\weslie\WatchTogether\Config;
 use tk\weslie\WatchTogether\Files;
+use tk\weslie\WatchTogether\Net;
 use tk\weslie\WatchTogether\Ws\Hub;
 use Workerman\Timer;
 use Workerman\Worker;
@@ -27,12 +28,15 @@ $worker = new Worker('websocket://' . Config::get('wsHost') . ':' . Config::get(
 $worker->name  = 'watch-together';
 $worker->count = 1;   /* Der Raumzustand liegt im Speicher, also genau ein Prozess. */
 
-/* Raum und Name stehen in der Adresse des Handshakes. */
+/* Raum und Name stehen in der Adresse des Handshakes. Die Verbindung selbst
+   kommt vom Proxy (siehe watch-together.conf), die eigentliche Adresse
+   steht deshalb in X-Forwarded-For. */
 $worker->onWebSocketConnect = function ($conn, $header) use ($hub): void {
     $hub->join(
         $conn,
         (string)($_GET['room'] ?? ''),
-        (string)($_GET['name'] ?? '')
+        (string)($_GET['name'] ?? ''),
+        Net::headerIp((string)$header, $conn->getRemoteIp())
     );
 };
 

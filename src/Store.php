@@ -152,6 +152,7 @@ final class Store
             'mime'      => Files::mimeOf($file),
         ]);
         Rooms::touch($slug);
+        AuditLog::logUpload($slug, $meta['name'], $by, Net::httpIp());
 
         $row = $db->row($id);
         return $row === null ? [] : Db::toItem($slug, $row);

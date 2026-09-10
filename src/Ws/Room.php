@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace tk\weslie\WatchTogether\Ws;
 
+use tk\weslie\WatchTogether\AuditLog;
+
 final class Room
 {
     /** Farben fuer Namenskuerzel und Positionsmarken auf der Zeitleiste. */
@@ -38,6 +40,9 @@ final class Room
     public bool $live = false;
     public ?string $liveBy = null;
 
+    /** Id des Protokolleintrags der laufenden Uebertragung, siehe AuditLog. */
+    public ?int $liveLogId = null;
+
     public function __construct(string $slug)
     {
         $this->slug = $slug;
@@ -46,7 +51,7 @@ final class Room
 
     /* ------------------------------------------------------- Teilnehmer -- */
 
-    public function add(string $id, string $name, $conn): array
+    public function add(string $id, string $name, $conn, string $ip): array
     {
         $name = $this->freeName($name);
         $peer = [
@@ -54,6 +59,9 @@ final class Room
             'name'  => $name,
             'color' => self::colorFor($name),
             'conn'  => $conn,
+            /* Nur fuers Protokoll einer gestarteten Uebertragung, siehe
+               Hub::message() bei "live-start". */
+            'ip'    => $ip,
             'pos'   => 0.0,
             /* Welches Video dieser Teilnehmer geladen hat. Null heisst: noch
                keines, der Raum wartet also gegebenenfalls auf ihn. */
@@ -189,6 +197,10 @@ final class Room
     /** Uebertragung vorbei - ob gewollt beendet oder weil der Sender ging. */
     public function stopLive(): void
     {
+        if ($this->liveLogId !== null) {
+            AuditLog::streamEnd($this->liveLogId);
+            $this->liveLogId = null;
+        }
         $this->live = false;
         $this->liveBy = null;
         foreach (\array_keys($this->peers) as $id) {

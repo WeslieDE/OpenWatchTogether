@@ -18,14 +18,21 @@ final class Db
 
     private function __construct(private string $slug)
     {
-        $dir = Rooms::ensure($slug);
-        $this->pdo = new PDO('sqlite:' . $dir . '/room.sqlite', null, null, [
+        $dir  = Rooms::ensure($slug);
+        $path = $dir . '/room.sqlite';
+        $this->pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $this->pdo->exec('PRAGMA journal_mode = WAL');
         $this->pdo->exec('PRAGMA busy_timeout = 5000');
         $this->schema();
+
+        /* Apache und der getrennt laufende WebSocket-Prozess schreiben hier
+           beide hinein - siehe Files::share(). */
+        Files::share($path);
+        Files::share($path . '-wal');
+        Files::share($path . '-shm');
     }
 
     public static function of(string $slug): self

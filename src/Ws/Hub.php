@@ -44,6 +44,7 @@ declare(strict_types=1);
 
 namespace tk\weslie\WatchTogether\Ws;
 
+use tk\weslie\WatchTogether\AuditLog;
 use tk\weslie\WatchTogether\Config;
 use tk\weslie\WatchTogether\Db;
 use tk\weslie\WatchTogether\Moderation;
@@ -63,7 +64,7 @@ final class Hub
 
     /* --------------------------------------------------------- Verbindung -- */
 
-    public function join($conn, string $rawRoom, string $rawName): void
+    public function join($conn, string $rawRoom, string $rawName, string $ip = ''): void
     {
         $slug = Rooms::normalize($rawRoom);
         if ($slug === '') {
@@ -88,7 +89,7 @@ final class Hub
            PHP daraus einen Integer-Array-Key und die string-Signaturen
            weiter unten reissen (siehe part()/broadcast()). */
         $id      = 'p' . \bin2hex(\random_bytes(4));
-        $peer    = $room->add($id, $name, $conn);
+        $peer    = $room->add($id, $name, $conn, $ip);
 
         $this->seats[$conn->id] = ['slug' => $slug, 'peer' => $id];
 
@@ -379,6 +380,11 @@ final class Hub
                 $room->live = true;
                 $room->liveBy = $id;
                 if (!$wasLive) {
+                    $room->liveLogId = AuditLog::streamStart(
+                        $slug,
+                        $room->peers[$id]['name'],
+                        (string)($room->peers[$id]['ip'] ?? '')
+                    );
                     $this->broadcast($room, 'live', ['on' => true, 'byId' => $id]);
                 }
                 $this->to($conn, 'live-token', $this->liveToken($slug, $id));

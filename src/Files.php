@@ -15,6 +15,23 @@ final class Files
         }
     }
 
+    /**
+     * Schreibrecht fuer alle. Noetig fuer Dateien, die mehr als ein
+     * Systembenutzer beschreibt - etwa eine SQLite-Datenbank, an der sowohl
+     * Apache (Uploads) als auch der getrennt laufende WebSocket-Prozess
+     * haengen. Im Docker-Image laufen beide als www-data, das schadet also
+     * nicht; ausserhalb, wo sie unter verschiedenen Benutzern laufen koennen,
+     * verhindert es "database is locked/readonly" durch fehlende Rechte.
+     * Wer nicht Eigentuemer ist, darf ohnehin nicht chmod'en - dann hat es
+     * schon der Ersteller erledigt.
+     */
+    public static function share(string $path): void
+    {
+        if (\is_file($path)) {
+            @\chmod($path, 0666);
+        }
+    }
+
     public static function removeTree(string $dir): void
     {
         if (!\is_dir($dir)) {

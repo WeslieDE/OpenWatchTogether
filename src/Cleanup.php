@@ -107,6 +107,8 @@ final class Cleanup
      */
     public static function wipe(): void
     {
+        AuditLog::purgeOld();
+
         $media = (string)Config::get('mediaDir');
         Files::ensureDir($media);
 
