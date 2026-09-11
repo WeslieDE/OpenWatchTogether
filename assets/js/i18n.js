@@ -41,6 +41,13 @@
       "name.err.short":    "Mindestens zwei Zeichen.",
       "name.err.taken":    "Der Name ist im Raum schon vergeben.",
 
+      "pw.title":   "Passwort erforderlich",
+      "pw.lead":    "Dieser Raum verlangt ein Passwort, um Videos hochzuladen oder einen Livestream zu starten.",
+      "pw.label":   "Passwort",
+      "pw.cancel":  "Abbrechen",
+      "pw.submit":  "Weiter",
+      "pw.err":     "Falsches Passwort.",
+
       "top.add":      "Video hinzufügen",
       "top.live":     "Livestream starten",
       "top.liveStop": "Livestream beenden",
@@ -185,6 +192,7 @@
       "toast.liveStopped":   "Die Bildschirmübertragung ist vorbei",
       "toast.liveDenied":    "Nur der Taktgeber kann einen Livestream starten.",
       "toast.liveFailed":    "Die Bildschirmfreigabe wurde nicht erteilt.",
+      "toast.pwDenied":      "Falsches Passwort.",
 
       "link.title":     "Gleich geht es los",
       "link.wait":      "Der Raum wird geöffnet.",
@@ -225,6 +233,13 @@
       "name.cancel":       "Cancel",
       "name.err.short":    "At least two characters.",
       "name.err.taken":    "That name is already taken in this room.",
+
+      "pw.title":   "Password required",
+      "pw.lead":    "This room requires a password to upload videos or start a livestream.",
+      "pw.label":   "Password",
+      "pw.cancel":  "Cancel",
+      "pw.submit":  "Continue",
+      "pw.err":     "Wrong password.",
 
       "top.add":      "Add video",
       "top.live":     "Start livestream",
@@ -370,6 +385,7 @@
       "toast.liveStopped":   "The livestream has ended",
       "toast.liveDenied":    "Only the pace-setter can start a livestream.",
       "toast.liveFailed":    "Screen sharing was not allowed.",
+      "toast.pwDenied":      "Wrong password.",
 
       "link.title":     "Almost there",
       "link.wait":      "Opening the room.",

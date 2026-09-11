@@ -129,6 +129,25 @@
   </div>
 </div>
 
+<!-- ============================================================ PASSWORT ======== -->
+<div class="veil" id="veilPassword" hidden>
+  <div class="sheet sheet-narrow" role="dialog" aria-modal="true" aria-labelledby="pwTitle">
+    <h2 class="sheet-title" id="pwTitle" data-i18n="pw.title"></h2>
+    <p class="sheet-lead" data-i18n="pw.lead"></p>
+    <form class="field-form" id="formPassword" novalidate>
+      <div class="field">
+        <label class="field-label" for="inpPassword" data-i18n="pw.label"></label>
+        <input class="input" id="inpPassword" type="password" autocomplete="current-password" required>
+        <p class="field-error" id="errPassword" hidden></p>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-ghost" type="button" id="btnPasswordCancel" data-i18n="pw.cancel"></button>
+        <button class="btn btn-accent" type="submit" id="btnPasswordSave" data-i18n="pw.submit"></button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ============================================================ VERBINDUNG ====== -->
 <div class="veil" id="veilLink" hidden>
   <div class="sheet sheet-narrow sheet-notice" role="status">

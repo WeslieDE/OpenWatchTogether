@@ -37,6 +37,7 @@
   var STORE_WIDE    = "wt.wide";
   var STORE_QUALITY = "wt.quality";
   var STORE_DENIED  = "wt.denied";
+  var STORE_PWHASH  = "wt.pwhash";
 
   var SYNC_OK   = 0.4;    /* darunter gilt alles als gleich */
   var SYNC_HARD = 20;     /* darueber wird hart gesprungen  */
@@ -96,6 +97,9 @@
     errName: $("errName"), nameTitle: $("nameTitle"), nameLead: $("nameLead"),
     btnNameCancel: $("btnNameCancel"), btnNameSave: $("btnNameSave"),
     nameSuggestRow: $("nameSuggestRow"), btnNameMore: $("btnNameMore"),
+
+    veilPassword: $("veilPassword"), formPassword: $("formPassword"), inpPassword: $("inpPassword"),
+    errPassword: $("errPassword"), btnPasswordCancel: $("btnPasswordCancel"),
 
     veilLink: $("veilLink"), linkLead: $("linkLead"),
 
@@ -207,7 +211,7 @@
 
   function veilOpen() {
     return !(el.veilRoom.hidden && el.veilName.hidden && el.veilUpload.hidden &&
-             el.veilLink.hidden && el.veilSettings.hidden);
+             el.veilLink.hidden && el.veilSettings.hidden && el.veilPassword.hidden);
   }
 
   function store(key, value) {
@@ -219,6 +223,69 @@
   function unstore(key) {
     try { global.localStorage.removeItem(key); } catch (e) { /* ohne Speicher weiter */ }
   }
+
+  /* --------------------------------------------------------- Passwortschutz */
+  /* Optional, per WT_PASSWORD gesetzt. Nie das Passwort selbst, nur sein
+     SHA-256-Hash liegt im Speicher des Browsers und geht mit den Anfragen
+     fuer Upload und Livestream mit - so bleibt der Raum wieder gesperrt,
+     sobald der Server ein anderes Passwort bekommt. Zuschauen ist davon
+     nie betroffen. */
+
+  function pwHash() { return stored(STORE_PWHASH); }
+
+  function sha256Hex(text) {
+    var bytes = new global.TextEncoder().encode(text);
+    return global.crypto.subtle.digest("SHA-256", bytes).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return b.toString(16).padStart(2, "0");
+      }).join("");
+    });
+  }
+
+  var pwPending = null;   /* Aktion, die nach richtiger Eingabe weiterlaeuft */
+
+  /** Fuehrt action() aus - fragt vorher nach dem Passwort, falls eines noetig
+      und noch keiner der gemerkte Hash gueltig ist. */
+  function ensureUnlocked(action) {
+    if (!api.settings().needsPassword) { action(); return; }
+    var hash = pwHash();
+    if (!hash) { openPasswordPrompt(action); return; }
+    api.auth(hash).then(action, function () {
+      unstore(STORE_PWHASH);
+      openPasswordPrompt(action);
+    });
+  }
+
+  function openPasswordPrompt(action) {
+    pwPending = action;
+    el.errPassword.hidden = true;
+    el.inpPassword.value = "";
+    openVeil(el.veilPassword, el.inpPassword);
+  }
+
+  el.btnPasswordCancel.addEventListener("click", function () {
+    pwPending = null;
+    closeVeil(el.veilPassword);
+  });
+
+  el.formPassword.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var pw = el.inpPassword.value;
+    if (!pw) return;
+    el.errPassword.hidden = true;
+    sha256Hex(pw).then(function (hash) {
+      return api.auth(hash).then(function () {
+        store(STORE_PWHASH, hash);
+        closeVeil(el.veilPassword);
+        var action = pwPending;
+        pwPending = null;
+        if (action) action();
+      });
+    }).catch(function () {
+      el.errPassword.textContent = t("pw.err");
+      el.errPassword.hidden = false;
+    });
+  });
 
   /* ------------------------------------------------------------ Teilnehmer */
 
@@ -489,6 +556,19 @@
           liveTokenWaiter = null;
           giveToken(d);
         }
+        break;
+
+      /* Nur an den Sender: das Passwort fehlt oder stimmt nicht mehr - der
+         gemerkte Hash gilt nicht mehr, ein erneuter Versuch fragt wieder. */
+      case "live-denied":
+        unstore(STORE_PWHASH);
+        liveTokenWaiter = null;
+        if (S.live.byId === S.me.id) {
+          S.live = { on: false, byId: null };
+          stopLiveLocal();
+          renderLiveUi();
+        }
+        toast(t("toast.pwDenied"), "i-live");
         break;
 
       /* Jemandes Verbindung zum SFU steht oder ist weg. */
@@ -871,7 +951,7 @@
      das SFU kennt keine Auffrischung, das entscheidet allein der Server. */
   function requestLiveToken(cb) {
     liveTokenWaiter = cb;
-    send("live-start", {});
+    send("live-start", { hash: pwHash() || "" });
   }
 
   function startBroadcast() {
@@ -1014,7 +1094,7 @@
   el.btnLive.addEventListener("click", function () {
     if (!isMaster()) { denyControl(); return; }
     if (isLive()) stopBroadcast();
-    else startBroadcast();
+    else ensureUnlocked(startBroadcast);
   });
 
   /* --------------------------------------------------------- Gemeinsam los */
@@ -2348,9 +2428,10 @@
     paintUpload();
   }
 
-  el.btnAdd.addEventListener("click", openUpload);
-  el.btnAddEmpty.addEventListener("click", openUpload);
-  el.btnAddQueue.addEventListener("click", openUpload);
+  function openUploadGated() { ensureUnlocked(openUpload); }
+  el.btnAdd.addEventListener("click", openUploadGated);
+  el.btnAddEmpty.addEventListener("click", openUploadGated);
+  el.btnAddQueue.addEventListener("click", openUploadGated);
   el.btnUpClose.addEventListener("click", function () {
     if (activeJobs().length) minimizeUpload();
     else closeVeil(el.veilUpload);
@@ -2532,6 +2613,7 @@
       title: job.title,
       by: S.me.name,
       byId: S.me.id,
+      hash: pwHash(),
       onProgress: function (sent) {
         job.sent = sent;
 

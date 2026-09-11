@@ -20,6 +20,7 @@
  *     settings    Einstellungen des Raumes, sobald jemand sie geaendert hat
  *     live        Bildschirmuebertragung an/aus, und von wem
  *     live-token  nur an den Sender: Token fuer den SFU-Prozess
+ *     live-denied nur an den Sender: falsches oder fehlendes Passwort
  *     live-status jemand meldet, ob seine Verbindung zum SFU steht
  *     denied      Beitritt oder Umbenennung abgelehnt (leerer/gesperrter
  *                 Raum- oder Anzeigename), die Leitung macht danach zu
@@ -45,6 +46,7 @@ declare(strict_types=1);
 namespace tk\weslie\WatchTogether\Ws;
 
 use tk\weslie\WatchTogether\AuditLog;
+use tk\weslie\WatchTogether\Auth;
 use tk\weslie\WatchTogether\Config;
 use tk\weslie\WatchTogether\Db;
 use tk\weslie\WatchTogether\Moderation;
@@ -374,6 +376,10 @@ final class Hub
                beim allerersten Mal. */
             case 'live-start':
                 if ($room->master !== $id) {
+                    break;
+                }
+                if (!Auth::check((string)($d['hash'] ?? ''))) {
+                    $this->to($conn, 'live-denied', []);
                     break;
                 }
                 $wasLive = $room->live;

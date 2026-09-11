@@ -287,6 +287,10 @@ in the way. Set `WT_MAX_BYTES` if you *want* a limit for your installation.
 Any time — individually or all at once, and the queue entry disappears for
 everyone.
 
+**Can I require a password to upload or start a livestream?**
+Yes — set `-e WT_PASSWORD=yourpassword`. Watching stays open for everyone
+regardless; the password only gates adding videos and going live.
+
 **Do I need accounts or a database server?**
 Neither. No login, no PostgreSQL, no Redis — just the container.
 

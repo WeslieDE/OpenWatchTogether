@@ -27,6 +27,7 @@ docker run -d --name "$NAME" \
   -p 42000:42000/tcp \
   -p 42000:42000/udp \
   -e WT_SFU_ANNOUNCED_IP=127.0.0.1 \
+  -e WT_PASSWORD=test123 \
   -v "$DATA_DIR":/data \
   "$IMAGE" >/dev/null
 
@@ -52,4 +53,5 @@ echo "andere Endung -> $code (403 erwartet: gesperrt)"
 echo
 echo "Laeuft auf http://localhost:$PORT - Strg+C beendet und entfernt den Container."
 echo "Daten (auch fuer /media) liegen in $DATA_DIR."
+echo "Passwort fuer Upload/Livestream: test123"
 docker logs -f "$NAME"

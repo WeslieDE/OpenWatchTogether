@@ -281,6 +281,7 @@ Every setting is an environment variable, and every one has a sensible default.
 |---|---|---|
 | `WT_DATA_DIR` | `~/.weslie/WatchTogether`, `/data` in Docker | Where videos, thumbnails and room databases live |
 | `WT_MAX_BYTES` | `0` | Maximum size per file — `0` means **no limit** |
+| `WT_PASSWORD` | *(empty)* | Password required to upload videos or start a livestream — empty means anyone can, as before. Watching is always open to everyone regardless of this setting |
 | `WT_CHUNK_BYTES` | `4194304` | Size of a single upload chunk (4 MB) |
 | `WT_WS_URL` | `/ws` in Docker, empty otherwise | Address the browser uses for the live connection. Empty = `ws://<host>:<port>`, a `/path` = behind the same web server |
 | `WT_WS_HOST` | `0.0.0.0` | Interface the live process listens on |

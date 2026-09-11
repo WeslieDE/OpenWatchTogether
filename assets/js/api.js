@@ -15,7 +15,7 @@
   var WT = global.tk.weslie.WatchTogether;
 
   var BASE = "api/index.php";
-  var settings = { chunkBytes: 4 * 1048576, needsPoster: false };
+  var settings = { chunkBytes: 4 * 1048576, needsPoster: false, needsPassword: false };
 
   function url(action, params) {
     var q = "?do=" + encodeURIComponent(action);
@@ -78,7 +78,8 @@
     var promise = post("upload-begin", {
       room: opts.room,
       name: opts.file.name,
-      size: opts.file.size
+      size: opts.file.size,
+      hash: opts.hash || ""
     }).then(function (started) {
       guard();
       uploadId = started.id;
@@ -182,6 +183,8 @@
       });
     },
     settings: function () { return settings; },
+    /* Prueft nur den Passwort-Hash, ohne dass ein Upload oder Livestream daran haengt. */
+    auth:   function (hash) { return post("auth", { hash: hash }); },
     room:   function (slug) { return post("room", { room: slug }); },
     queue:  function (slug) { return get("queue", { room: slug }); },
     remove: function (slug, id) { return post("remove", { room: slug, id: id }); },

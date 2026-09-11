@@ -60,6 +60,10 @@ final class Config
                Rest der App gibt es keinen Passwortschutz. */
             'sfuSecret' => self::env('WT_SFU_SECRET') ?? '',
 
+            /* Optionaler Passwortschutz fuers Hochladen und den Livestream.
+               Leer heisst: das darf jeder, wie bisher. Siehe Auth.php. */
+            'password'  => self::env('WT_PASSWORD') ?? '',
+
             /* Bild und Laufzeit. Leer heisst: der Browser springt ein. */
             'ffmpeg'    => self::env('WT_FFMPEG')  ?? self::bundled('ffmpeg'),
             'ffprobe'   => self::env('WT_FFPROBE') ?? self::bundled('ffprobe'),

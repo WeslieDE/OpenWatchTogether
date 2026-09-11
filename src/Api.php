@@ -3,6 +3,7 @@
  * Die API. Gewoehnliches PHP, angesprochen per AJAX aus dem Browser.
  *
  *   do=config          Was der Browser wissen muss, bevor es losgeht
+ *   do=auth            Passwort-Hash pruefen, ohne dass etwas daran haengt
  *   do=room            Raum betreten oder anlegen, liefert die Warteschlange
  *   do=queue           Warteschlange des Raumes
  *   do=upload-begin    Uebertragung anmelden
@@ -33,6 +34,7 @@ final class Api
 
             switch ($do) {
                 case 'config':        self::config();      break;
+                case 'auth':          self::auth();        break;
                 case 'room':          self::room();        break;
                 case 'queue':         self::queue();       break;
                 case 'upload-begin':  self::uploadBegin(); break;
@@ -74,7 +76,20 @@ final class Api
             'chunkBytes' => (int)Config::get('chunkBytes'),
             /* Fehlt ffmpeg, steuert der Browser Laufzeit und Bild selbst bei. */
             'needsPoster' => !Probe::available(),
+            /* Fragt der Browser vorm Hochladen oder Live-Start nach einem
+               Passwort? Siehe Auth.php. */
+            'needsPassword' => Auth::required(),
         ]);
+    }
+
+    /** Nur die Pruefung selbst, ohne dass ein Upload oder Livestream daran haengt. */
+    private static function auth(): void
+    {
+        $in = self::body();
+        if (!Auth::check((string)($in['hash'] ?? ''))) {
+            throw new ApiError('password', 'Falsches Passwort.', 401);
+        }
+        self::json(['ok' => true]);
     }
 
     private static function room(): void
@@ -108,6 +123,11 @@ final class Api
     {
         $in   = self::body();
         $slug = self::slug();
+
+        if (!Auth::check((string)($in['hash'] ?? ''))) {
+            throw new ApiError('password', 'Falsches Passwort.', 401);
+        }
+
         Rooms::ensure($slug);
 
         $started = Store::begin(
