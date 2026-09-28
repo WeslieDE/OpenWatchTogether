@@ -44,6 +44,7 @@
  *     produce {transportId, kind, rtpParameters}     nur mit role=produce
  *     consume {producerId, rtpCapabilities}
  *     resume-consumer {consumerId}
+ *     request-keyframe {consumerId}                  nur Video-Consumer
  *
  *   create-plain-transport/connect-plain-transport sind das Plain-RTP-
  *   Gegenstueck zu create-transport/connect-transport, fuer Zuschauer ohne
@@ -466,6 +467,16 @@ async function onMessage(room, conn, raw) {
       case 'resume-consumer': {
         const consumer = conn.consumers.get(String(d.consumerId));
         if (consumer) await consumer.resume();
+        break;
+      }
+
+      /* HLSStream fordert nach dem Start seines ffmpeg einen frischen
+         Keyframe an - der beim Resume angeforderte kam meist schon an, bevor
+         ffmpeg den Port geoeffnet hatte, und bei einer Bildschirmuebertragung
+         kann der naechste von selbst sehr lange auf sich warten lassen. */
+      case 'request-keyframe': {
+        const consumer = conn.consumers.get(String(d.consumerId));
+        if (consumer && consumer.kind === 'video') await consumer.requestKeyFrame();
         break;
       }
 

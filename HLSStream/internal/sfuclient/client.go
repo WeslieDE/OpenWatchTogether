@@ -33,6 +33,7 @@ type Producer struct {
 // Track ist das Ergebnis, konsumiert zu haben: genug, um eine SDP-Datei fuer
 // ffmpeg zu bauen (siehe internal/pipeline).
 type Track struct {
+	ConsumerID  string
 	Kind        string // "video" | "audio"
 	Port        int    // localhost-Port, an den der SFU jetzt sendet
 	PayloadType int
@@ -54,6 +55,7 @@ type Session struct {
 	conn *websocket.Conn
 
 	mu       sync.Mutex
+	writeMu  sync.Mutex
 	replies  chan wireMessage
 	Events   chan Producer // "new-producer"
 	Closed   chan Producer // "producer-closed" (Kind bleibt leer - der SFU sagt es nicht mehr)
@@ -180,6 +182,14 @@ func (s *Session) waitReply(wantType string, timeout time.Duration) (wireMessage
 	}
 }
 
+// RequestKeyFrame bittet den SFU um einen frischen Keyframe fuer einen Video-
+// Track - siehe "request-keyframe" in sfu/server.js.
+func (s *Session) RequestKeyFrame(t Track) error {
+	return s.send("request-keyframe", struct {
+		ConsumerID string `json:"consumerId"`
+	}{t.ConsumerID})
+}
+
 func (s *Session) send(msgType string, data any) error {
 	line, err := json.Marshal(struct {
 		Type string `json:"type"`
@@ -188,6 +198,10 @@ func (s *Session) send(msgType string, data any) error {
 	if err != nil {
 		return err
 	}
+	// RequestKeyFrame() kommt aus einer anderen Goroutine als der Aufbau -
+	// die WebSocket-Bibliothek erlaubt aber nur einen Schreiber zur Zeit.
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	return s.conn.WriteMessage(websocket.TextMessage, line)
 }
 
@@ -258,6 +272,7 @@ func (s *Session) Consume(p Producer, port int) (Track, error) {
 	}
 
 	return Track{
+		ConsumerID:  c.ID,
 		Kind:        c.Kind,
 		Port:        port,
 		PayloadType: codec.PayloadType,

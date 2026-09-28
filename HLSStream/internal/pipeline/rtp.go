@@ -29,24 +29,21 @@ func sdpHeader() string {
 	return b.String()
 }
 
-// WriteVideoSDP/WriteAudioSDP bauen je eine minimale SDP-Datei mit genau
-// einer Medienzeile, damit Video und Audio von zwei getrennten ffmpeg-
-// Prozessen gelesen werden koennen, ohne sich denselben UDP-Port streitig zu
-// machen - siehe StartLiveSource() in source.go.
-func WriteVideoSDP(dir string, video sfuclient.Track) (string, error) {
+// WriteLiveSDP baut die SDP-Datei fuer die Live-Quelle: Bild und - falls
+// vorhanden - Ton in derselben Datei, damit ein einziger ffmpeg-Prozess beide
+// liest und ihre Zeitstempel gemeinsam fuehrt (siehe StartLiveSource() in
+// source.go). Jede Spur hat ihren eigenen Port, ffmpeg haelt sie darueber
+// auseinander.
+func WriteLiveSDP(dir string, video sfuclient.Track, audio *sfuclient.Track) (string, error) {
 	var b strings.Builder
 	b.WriteString(sdpHeader())
 	fmt.Fprintf(&b, "m=video %d RTP/AVP %d\r\n", video.Port, video.PayloadType)
 	fmt.Fprintf(&b, "a=rtpmap:%d %s/%d\r\n", video.PayloadType, codecName(video.MimeType), video.ClockRate)
-	return writeFile(dir, "live-video.sdp", b.String())
-}
-
-func WriteAudioSDP(dir string, audio sfuclient.Track) (string, error) {
-	var b strings.Builder
-	b.WriteString(sdpHeader())
-	fmt.Fprintf(&b, "m=audio %d RTP/AVP %d\r\n", audio.Port, audio.PayloadType)
-	fmt.Fprintf(&b, "a=rtpmap:%d %s/%d/%d\r\n", audio.PayloadType, codecName(audio.MimeType), audio.ClockRate, audio.Channels)
-	return writeFile(dir, "live-audio.sdp", b.String())
+	if audio != nil {
+		fmt.Fprintf(&b, "m=audio %d RTP/AVP %d\r\n", audio.Port, audio.PayloadType)
+		fmt.Fprintf(&b, "a=rtpmap:%d %s/%d/%d\r\n", audio.PayloadType, codecName(audio.MimeType), audio.ClockRate, audio.Channels)
+	}
+	return writeFile(dir, "live.sdp", b.String())
 }
 
 func writeFile(dir, name, content string) (string, error) {

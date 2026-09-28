@@ -195,16 +195,16 @@ func blackFrame() []byte {
 // newVideoPipe/newAudioPipe: newFramePipe() fuer die jeweilige dauerhafte
 // Pipe, mit Mitzaehlen fuer Align().
 func (p *Pipes) newVideoPipe() (*os.File, <-chan struct{}, error) {
-	return newFramePipe(p.VideoW, &p.videoMu, videoFrameBytes, &p.videoFrames, 1, func(buf []byte) {
+	return newFramePipe(p.VideoW, &p.videoMu, videoFrameBytes, 1, videoQueueChunks, &p.videoFrames, func(chunk []byte) {
 		if p.lastVideo == nil {
 			p.lastVideo = make([]byte, videoFrameBytes)
 		}
-		copy(p.lastVideo, buf)
+		copy(p.lastVideo, chunk[len(chunk)-videoFrameBytes:])
 	})
 }
 
 func (p *Pipes) newAudioPipe() (*os.File, <-chan struct{}, error) {
-	return newFramePipe(p.AudioW, &p.audioMu, audioFrameBytes, &p.audioSamples, 1, nil)
+	return newFramePipe(p.AudioW, &p.audioMu, audioFrameBytes, samplesPerFrame, audioQueueChunks, &p.audioSamples, nil)
 }
 
 // newFramePipe legt fuer genau einen Quellprozess ein eigenes, privates Pipe-
@@ -228,41 +228,81 @@ func (p *Pipes) newAudioPipe() (*os.File, <-chan struct{}, error) {
 // verlorenes Teilbild beim Wechsel als eine dauerhaft verschobene
 // Bildgrenze.
 //
-// count wird vor jedem write() um step erhoeht (bei Fehler zurueckgenommen),
-// onFrame (optional) laeuft davor, noch unter mu - beides fuer
-// Pipes.Align(). Der zurueckgegebene Kanal wird geschlossen, sobald die
-// Weiterleitung fertig ist - Align() wartet darauf.
-func newFramePipe(dst *os.File, mu *sync.Mutex, frameSize int, count *atomic.Int64, step int64, onFrame func([]byte)) (*os.File, <-chan struct{}, error) {
+// Zwischen Lesen und Weiterreichen liegt ausserdem eine Warteschlange
+// (queueChunks Haeppchen zu je chunkFrames Frames), damit ein Quellprozess
+// nie blockiert, nur weil der Encoder gerade eine seiner Spuren nicht
+// abnimmt. Der Encoder liest die zeitlich vorauslaufende Spur erst weiter,
+// wenn die andere aufgeholt hat, und eine Pipe fasst oft nur wenige KB
+// (unter Linux bis herunter auf 8 KB, sobald ein Benutzer viele Pipes offen
+// hat). Bei der Live-Quelle, die Bild und Ton aus *einem* Prozess liefert,
+// hielt ein blockierter Tonausgang den ganzen Prozess an - samt der Bildspur,
+// auf die der Encoder gerade wartete (Deadlock beim Warten auf den ersten
+// Keyframe).
+//
+// count wird vor jedem write() um die Zahl der Frames im Haeppchen erhoeht
+// (bei Fehler zurueckgenommen), onFrame (optional) laeuft davor, noch unter
+// mu - beides fuer Pipes.Align(). Der zurueckgegebene Kanal wird
+// geschlossen, sobald die Weiterleitung alles abgegeben hat - Align() wartet
+// darauf.
+func newFramePipe(dst *os.File, mu *sync.Mutex, frameSize, chunkFrames, queueChunks int, count *atomic.Int64, onFrame func([]byte)) (*os.File, <-chan struct{}, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
 		return nil, nil, err
 	}
-	done := make(chan struct{})
+	queue := make(chan []byte, queueChunks)
 	go func() {
-		defer close(done)
+		defer close(queue)
 		defer r.Close()
-		buf := make([]byte, frameSize)
+		chunkSize := frameSize * chunkFrames
 		for {
-			if _, err := io.ReadFull(r, buf); err != nil {
-				return
+			buf := make([]byte, chunkSize)
+			n, err := io.ReadFull(r, buf)
+			// Beim Ende nur ganze Frames weiterreichen, den angebrochenen
+			// Rest verwerfen (siehe oben).
+			if n -= n % frameSize; n > 0 {
+				queue <- buf[:n]
 			}
-			mu.Lock()
-			if onFrame != nil {
-				onFrame(buf)
-			}
-			count.Add(step)
-			_, werr := dst.Write(buf)
-			if werr != nil {
-				count.Add(-step)
-			}
-			mu.Unlock()
-			if werr != nil {
+			if err != nil {
 				return
 			}
 		}
 	}()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		failed := false
+		for chunk := range queue {
+			// Nach einem Schreibfehler weiter leerlesen statt aufzuhoeren -
+			// sonst blockierte der Leser oben und mit ihm der Quellprozess.
+			if failed {
+				continue
+			}
+			frames := int64(len(chunk) / frameSize)
+			mu.Lock()
+			if onFrame != nil {
+				onFrame(chunk)
+			}
+			count.Add(frames)
+			if _, err := dst.Write(chunk); err != nil {
+				count.Add(-frames)
+				failed = true
+			}
+			mu.Unlock()
+		}
+	}()
 	return w, done, nil
 }
+
+// videoQueueChunks/audioQueueChunks: Warteschlangen der Weiterleitungen,
+// siehe newFramePipe(). Ton in Haeppchen zu je einem Bild (2000 Samples),
+// 240 davon sind 10s - genug, um beim Start einer Live-Quelle auf den ersten
+// Keyframe zu warten. Beim Bild (1,3 MB je Frame) reicht eine halbe Sekunde:
+// dort, wo es vorauslaeuft, nur um das, was die Quelle in einem Rutsch
+// liefert.
+const (
+	videoQueueChunks = FPS / 2
+	audioQueueChunks = 10 * FPS
+)
 
 // SourcePair sind die zwei Prozesse, die gerade Bild bzw. Ton in die Pipes
 // schreiben - getrennt gehalten, siehe die Begruendung bei videoOutputArgs().
@@ -464,23 +504,86 @@ func StartFileSource(ffmpegPath, room, file string, startSeconds float64, hasAud
 	return startPair(video, audio, vErr, aErr, vDone, aDone)
 }
 
+// liveVideoFilter: videoFilter, nur dass fps den Anfang bis Zeitstempel 0
+// mit dem ersten Bild auffuellt - Gegenstueck zu first_pts=0 beim Ton, siehe
+// StartLiveSource().
+const liveVideoFilter = videoFilter + ":start_time=0"
+
 // StartLiveSource reencoded eine laufende Bildschirmuebertragung (per SDP aus
 // dem Plain-RTP-Consume beim SFU, siehe internal/sfuclient und rtp.go) in
-// dieselben Pipes. videoSDP/audioSDP enthalten je nur die eine Medienzeile -
-// zwei Prozesse, die dieselbe SDP mit beiden Zeilen laesen, wuerden sich um
-// denselben UDP-Port streiten. Fehlt eine Tonspur (Bildschirmuebertragung
-// ohne mitgeteiltes Audio), wird Stille beigemischt.
-func StartLiveSource(ffmpegPath, room, videoSDP, audioSDP string, pipes *Pipes) (*SourcePair, error) {
+// dieselben Pipes. Anders als Datei und Standbild laufen Bild und Ton hier in
+// *einem* ffmpeg-Prozess, der beide Spuren aus derselben SDP liest (Bild auf
+// fd 3, Ton auf fd 4).
+//
+// Grund: bei einer Live-Quelle bestimmt der Startzeitpunkt, welcher Moment
+// der Uebertragung als erstes Bild bzw. erstes Sample in den Encoder geht -
+// und der Encoder zaehlt ab da nur noch (siehe encoder.args()). Mit zwei
+// getrennten Prozessen setzte der Ton erst ein, nachdem das Bild sein erstes
+// Bild ausgegeben hatte (startVideoSynced()), das Bild wiederum erst am
+// ersten Keyframe nach dem Oeffnen des Ports - bei einer Bildschirmueber-
+// tragung leicht Sekunden spaeter. Beide Spuren begannen so an verschiedenen
+// Stellen der Uebertragung, und dieser Versatz blieb fuer die ganze
+// Uebertragung stehen (Raum "lilhannah", 2026-09-28). In einem Prozess
+// haben beide Spuren dieselbe Zeitachse (ffmpeg zieht die RTCP-Sender-
+// Reports des SFU dafuer heran), und fps=...:start_time=0 bzw.
+// aresample=first_pts=0 lassen beide exakt bei 0 beginnen: fehlt dem Bild
+// der Anfang (Warten auf den Keyframe), steht dort das erste Bild still,
+// fehlt dem Ton etwas, wird es mit Stille gefuellt. aresample=async=1 fuellt
+// ausserdem spaetere Luecken im Ton (verlorene Pakete), damit die Sample-
+// Anzahl nicht hinter der Zeit zurueckbleibt.
+//
+// Fehlt eine Tonspur (Bildschirmuebertragung ohne mitgeteiltes Audio), gibt
+// es nichts abzugleichen: dann Bild wie gehabt plus Stille aus einem
+// eigenen Prozess.
+func StartLiveSource(ffmpegPath, room, sdp string, hasAudio bool, pipes *Pipes) (*SourcePair, error) {
+	// analyzeduration 3s: ohne Keyframe kennt ffmpeg die Bildgroesse nicht
+	// und gibt nach Ablauf der Frist die Bildspur auf. Der angeforderte
+	// Keyframe (room.requestKeyFrames()) braucht normalerweise nur ein paar
+	// hundert Millisekunden, die Frist ist nur der Puffer dafuer.
+	input := []string{
+		"-hide_banner", "-loglevel", "warning",
+		"-protocol_whitelist", "file,udp,rtp",
+		"-analyzeduration", "3000000", "-probesize", "5000000",
+		"-i", sdp,
+	}
+	if !hasAudio {
+		return startLiveVideoOnly(ffmpegPath, room, input, pipes)
+	}
+
 	vw, vDone, err := pipes.newVideoPipe()
 	if err != nil {
 		return nil, err
 	}
-	videoArgs := []string{
-		"-hide_banner", "-loglevel", "warning",
-		"-protocol_whitelist", "file,udp,rtp",
-		"-analyzeduration", "1000000", "-probesize", "1000000",
-		"-i", videoSDP, "-vf", videoFilter,
+	aw, aDone, err := pipes.newAudioPipe()
+	if err != nil {
+		vw.Close()
+		return nil, err
 	}
+	args := append([]string{}, input...)
+	args = append(args,
+		"-map", "0:v:0", "-vf", liveVideoFilter,
+		"-pix_fmt", "yuv420p", "-f", "rawvideo", "pipe:3",
+		"-map", "0:a:0", "-af", "aresample=async=1:first_pts=0",
+		"-f", "s16le", "-ar", strconv.Itoa(SampleRate), "-ac", strconv.Itoa(Channels), "pipe:4",
+	)
+	proc, err := start("source-live", ffmpegPath, args, []*os.File{vw, aw}, "[hls "+room+" live]")
+	vw.Close()
+	aw.Close()
+	if err != nil {
+		return nil, err
+	}
+	// Ein Prozess fuer beide Spuren - watchSourceExit() in room.go wartet
+	// auf Video.Done() oder Audio.Done(), und Stop() darf ihn ruhig zweimal
+	// killen.
+	return &SourcePair{Video: proc, Audio: proc, forwarders: []<-chan struct{}{vDone, aDone}}, nil
+}
+
+func startLiveVideoOnly(ffmpegPath, room string, input []string, pipes *Pipes) (*SourcePair, error) {
+	vw, vDone, err := pipes.newVideoPipe()
+	if err != nil {
+		return nil, err
+	}
+	videoArgs := append(append([]string{}, input...), "-map", "0:v:0", "-vf", videoFilter)
 	videoArgs = append(videoArgs, videoOutputArgs()...)
 	video, vErr := startVideoSynced("source-live-v", ffmpegPath, videoArgs, vw, "[hls "+room+" live bild]")
 
@@ -491,17 +594,7 @@ func StartLiveSource(ffmpegPath, room, videoSDP, audioSDP string, pipes *Pipes) 
 		}
 		return nil, err
 	}
-	var audioArgs []string
-	if audioSDP != "" {
-		audioArgs = []string{
-			"-hide_banner", "-loglevel", "warning",
-			"-protocol_whitelist", "file,udp,rtp",
-			"-analyzeduration", "1000000", "-probesize", "1000000",
-			"-i", audioSDP,
-		}
-	} else {
-		audioArgs = []string{"-hide_banner", "-loglevel", "warning", "-re", "-f", "lavfi", "-i", silentSource()}
-	}
+	audioArgs := []string{"-hide_banner", "-loglevel", "warning", "-re", "-f", "lavfi", "-i", silentSource()}
 	audioArgs = append(audioArgs, audioOutputArgs()...)
 	audio, aErr := start("source-live-a", ffmpegPath, audioArgs, []*os.File{aw}, "[hls "+room+" live ton]")
 	aw.Close()

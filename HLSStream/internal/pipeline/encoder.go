@@ -52,14 +52,23 @@ func (e *Encoder) args() []string {
 	// wallclock-Zeitstempeln auf einer aus Pipe-Haeppchen gelesenen Rohspur
 	// tatsaechlich passierte - nicht-monotone Zeitstempel zu erzeugen, sobald
 	// zwei Haeppchen sehr dicht hintereinander eintreffen.
+	//
+	// -probesize/-analyzeduration minimal: Format und Groesse beider
+	// Eingaenge stehen hier fest, zu analysieren gibt es nichts. Ohne das
+	// liest ffmpeg (7.1) beim Oeffnen bis zu 5s Ton vor, bevor es ueberhaupt
+	// Bild abnimmt - liefert die Quelle Bild und Ton aus einem Prozess (Live),
+	// staut sich dabei ihr Bildausgang, sie liefert keinen Ton mehr nach, und
+	// der Encoder bleibt fuer immer beim Oeffnen stehen.
 	args := []string{
 		"-hide_banner", "-loglevel", "warning",
+		"-probesize", "32", "-analyzeduration", "0",
 		"-thread_queue_size", "512",
 		"-f", "rawvideo", "-pix_fmt", "yuv420p",
 		"-s", strconv.Itoa(Width) + "x" + strconv.Itoa(Height),
 		"-r", strconv.Itoa(FPS),
 		"-i", "pipe:3",
 
+		"-probesize", "32", "-analyzeduration", "0",
 		"-thread_queue_size", "512",
 		"-f", "s16le", "-ar", strconv.Itoa(SampleRate), "-ac", strconv.Itoa(Channels),
 		"-i", "pipe:4",

@@ -79,8 +79,9 @@ type Room struct {
 	liveEpoch    int
 	liveSession  *sfuclient.Session
 	liveReadyOK  bool
-	liveVideoSDP string
-	liveAudioSDP string // leer = keine Tonspur gemeldet
+	liveSDP      string
+	liveHasAudio bool
+	liveVideo    sfuclient.Track
 
 	appliedItemID string
 	appliedT      float64
@@ -404,7 +405,10 @@ func (r *Room) switchTo(kind string, item hub.QueueItem, startAt float64) {
 		}
 
 	case "live":
-		proc, err = pipeline.StartLiveSource(r.cfg.FFmpegPath, r.slug, r.liveVideoSDP, r.liveAudioSDP, r.pipes)
+		proc, err = pipeline.StartLiveSource(r.cfg.FFmpegPath, r.slug, r.liveSDP, r.liveHasAudio, r.pipes)
+		if err == nil {
+			go requestKeyFrames(r.liveSession, r.liveVideo)
+		}
 
 	default: // "idle"
 		proc, err = pipeline.StartIdleSource(r.cfg.FFmpegPath, r.slug, r.cfg.PausedImage, r.pipes)
@@ -565,27 +569,41 @@ func (r *Room) handleLiveReady(res liveResult) {
 	}
 
 	outDir := filepath.Join(r.cfg.HLSDataDir, r.slug)
-	videoSDP, err := pipeline.WriteVideoSDP(outDir, res.videoTrack)
+	sdp, err := pipeline.WriteLiveSDP(outDir, res.videoTrack, res.audioTrack)
 	if err != nil {
-		log.Printf("[hls %s] Video-SDP konnte nicht geschrieben werden: %v", r.slug, err)
+		log.Printf("[hls %s] Live-SDP konnte nicht geschrieben werden: %v", r.slug, err)
 		res.session.Close()
 		return
 	}
-	audioSDP := ""
-	if res.audioTrack != nil {
-		audioSDP, err = pipeline.WriteAudioSDP(outDir, *res.audioTrack)
-		if err != nil {
-			log.Printf("[hls %s] Audio-SDP konnte nicht geschrieben werden: %v", r.slug, err)
-			// Kein Grund, die ganze Uebertragung abzubrechen - einfach ohne Ton.
-			audioSDP = ""
-		}
-	}
 
 	r.liveSession = res.session
-	r.liveVideoSDP = videoSDP
-	r.liveAudioSDP = audioSDP
+	r.liveSDP = sdp
+	r.liveHasAudio = res.audioTrack != nil
+	r.liveVideo = res.videoTrack
 	r.liveReadyOK = true
 	r.applySource()
+}
+
+// keyFrameDelays: wann nach dem Start der Live-Quelle ein frischer Keyframe
+// angefordert wird. Der beim Resume des Consumers kam meist an, bevor ffmpeg
+// lauschte - ohne neuen wartet das Bild bis zum naechsten von selbst
+// gesendeten, bei einer Bildschirmuebertragung leicht viele Sekunden, und
+// der Ton staut sich so lange im Encoder. Mehrfach, falls ffmpeg beim
+// ersten Mal noch mit dem Einlesen der SDP beschaeftigt ist.
+var keyFrameDelays = []time.Duration{300 * time.Millisecond, time.Second, 3 * time.Second}
+
+func requestKeyFrames(session *sfuclient.Session, video sfuclient.Track) {
+	if session == nil {
+		return
+	}
+	var waited time.Duration
+	for _, d := range keyFrameDelays {
+		time.Sleep(d - waited)
+		waited = d
+		if err := session.RequestKeyFrame(video); err != nil {
+			return
+		}
+	}
 }
 
 var errNoVideoProducer = &roomError{"kein Video-Producer innerhalb der Frist"}
