@@ -376,13 +376,14 @@ func (r *Room) applySource() {
 
 func (r *Room) switchTo(kind string, item hub.QueueItem, startAt float64) {
 	log.Printf("[hls %s] Quelle: %s -> %s", r.slug, r.sourceKind, kind)
-	r.currentSource.Stop()
+	old := r.currentSource
+	old.Stop()
 	r.currentSource = nil
 
 	// Bild und Ton vor der neuen Quelle wieder auf gleiche Laenge bringen,
 	// sonst bliebe jeder Rest der alten Quelle als Versatz stehen (siehe
 	// pipeline.Pipes.Align()).
-	if frames, samples, err := r.pipes.Align(); err != nil {
+	if frames, samples, err := r.pipes.Align(old.Forwarders()); err != nil {
 		log.Printf("[hls %s] Bild/Ton-Abgleich fehlgeschlagen: %v", r.slug, err)
 	} else if frames > 0 || samples > 0 {
 		log.Printf("[hls %s] Bild/Ton angeglichen: +%d Bilder, +%dms Ton", r.slug, frames, samples*1000/pipeline.SampleRate)

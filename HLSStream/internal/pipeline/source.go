@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -24,17 +26,20 @@ import (
 // Pipe atomar schreibt - ohne Sperre koennten sich zwei solche Schreibvor-
 // gaenge ineinander mischen.
 //
-// videoFrames/audioSamples zaehlen, was insgesamt schon in die dauerhaften
-// Pipes geflossen ist (unter videoMu bzw. audioMu), lastVideo ist eine Kopie
-// des zuletzt weitergereichten Bildes - beides braucht Align() unten.
+// videoFrames/audioSamples zaehlen, was insgesamt schon an die dauerhaften
+// Pipes gegangen ist - gezaehlt wird *vor* dem write(), ein gerade haengender
+// Schreibvorgang zaehlt also schon mit. Atomar statt unter videoMu/audioMu,
+// weil Align() die Zaehler lesen muss, waehrend eine Weiterleitung genau
+// diese Sperre haelt (siehe dort). lastVideo ist eine Kopie des zuletzt
+// weitergereichten Bildes (unter videoMu) - beides braucht Align() unten.
 type Pipes struct {
 	VideoR, VideoW *os.File
 	AudioR, AudioW *os.File
 
 	videoMu, audioMu sync.Mutex
 
-	videoFrames  int64
-	audioSamples int64
+	videoFrames  atomic.Int64
+	audioSamples atomic.Int64
 	lastVideo    []byte
 }
 
@@ -63,12 +68,21 @@ func (p *Pipes) Close() {
 // Align() beide Spuren auf exakt dieselbe Laenge bringen.
 const samplesPerFrame = SampleRate / FPS
 
+// alignTimeout: Sicherheitsnetz fuer Align() - normalerweise sind die
+// Weiterleitungen der alten Quelle Millisekunden nach dem Kill leer. Haengen
+// sie laenger (etwa weil der Encoder gerade neu startet und nicht liest),
+// geht der Wechsel trotzdem weiter, der Abgleich ist dann eben nur
+// ungefaehr.
+const alignTimeout = 3 * time.Second
+
 // Align bringt Bild und Ton in den dauerhaften Pipes wieder auf exakt
 // dieselbe Laenge, indem es die kuerzere Spur auffuellt: Bild mit dem
 // zuletzt gezeigten Bild (kurzes Standbild statt Schwarzblitz), Ton mit
-// Stille. Aufgerufen bei jedem Quellwechsel, nachdem die alte Quelle samt
-// ihrer Weiterleitungen beendet ist (SourcePair.Stop()) und bevor die neue
-// startet.
+// Stille. Aufgerufen bei jedem Quellwechsel, nachdem die alte Quelle gekillt
+// ist (SourcePair.Stop()) und bevor die neue startet. forwarders sind die
+// Weiterleitungen der alten Quelle (SourcePair.Forwarders()) - Align() kehrt
+// erst zurueck, wenn sie leer gelaufen sind und beide Spuren gleich lang
+// sind, oder nach alignTimeout.
 //
 // Grund: der Encoder zaehlt seine Zeitstempel rein aus Bild-/Sample-Anzahl
 // (siehe encoder.args()). startVideoSynced() gleicht nur den Start einer
@@ -78,38 +92,90 @@ const samplesPerFrame = SampleRate / FPS
 // jeder Neustart hinter dem Bildende lieferte 0 Bilder, aber ~0,5s Ton (der
 // Anfangs-Burst von -re). Ohne diesen Abgleich blieb jeder solche Rest fuer
 // den Rest der Raum-Lebensdauer als Tonversatz stehen und summierte sich auf.
-func (p *Pipes) Align() (padFrames, padSamples int64, err error) {
-	p.videoMu.Lock()
-	defer p.videoMu.Unlock()
-	p.audioMu.Lock()
-	defer p.audioMu.Unlock()
-
-	target := p.videoFrames
-	if need := (p.audioSamples + samplesPerFrame - 1) / samplesPerFrame; need > target {
-		target = need
-	}
-	padFrames = target - p.videoFrames
-	padSamples = target*samplesPerFrame - p.audioSamples
-
-	if padFrames > 0 {
-		frame := p.lastVideo
-		if frame == nil {
-			frame = blackFrame()
-		}
-		for i := int64(0); i < padFrames; i++ {
-			if _, err = p.VideoW.Write(frame); err != nil {
+//
+// Warum schrittweise und immer nur die zurueckliegende Spur: der Encoder
+// liest die Spur, die zeitlich vorausliegt, nicht weiter, bis die andere
+// aufgeholt hat. Die Weiterleitung der vorauslaufenden Spur kann deshalb
+// beim Kill mitten in einem write() haengen - mit gehaltener Sperre - und
+// kommt erst frei, wenn die andere Spur nachgeliefert wird. Die alte Quelle
+// ist dann aber schon tot, also muss Align() das selbst tun. Eine Fassung,
+// die zuerst beide Sperren nahm, blieb genau hier fuer immer stehen (live ->
+// idle im Raum "lilhannah", 2026-09-28): der Raum lieferte danach nie wieder
+// ein Segment. Die zurueckliegende Spur dagegen liest der Encoder immer,
+// ihre Sperre ist also nie auf Dauer belegt.
+func (p *Pipes) Align(forwarders []<-chan struct{}) (padFrames, padSamples int64, err error) {
+	deadline := time.Now().Add(alignTimeout)
+	for {
+		frames := p.videoFrames.Load()
+		samples := p.audioSamples.Load()
+		switch {
+		case frames*samplesPerFrame < samples:
+			if err = p.padVideo(); err != nil {
 				return padFrames, padSamples, err
 			}
-			p.videoFrames++
+			padFrames++
+			continue
+		case samples < frames*samplesPerFrame:
+			n := frames*samplesPerFrame - samples
+			if n > SampleRate {
+				n = SampleRate
+			}
+			if err = p.padAudio(n); err != nil {
+				return padFrames, padSamples, err
+			}
+			padSamples += n
+			continue
+		}
+
+		// Gleich lang - fertig, sobald die alte Quelle nichts mehr
+		// nachliefert.
+		if allClosed(forwarders) {
+			return padFrames, padSamples, nil
+		}
+		if time.Now().After(deadline) {
+			return padFrames, padSamples, errAlignTimeout
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+var errAlignTimeout = errors.New("Weiterleitungen der alten Quelle nicht rechtzeitig leer")
+
+func (p *Pipes) padVideo() error {
+	p.videoMu.Lock()
+	defer p.videoMu.Unlock()
+	frame := p.lastVideo
+	if frame == nil {
+		frame = blackFrame()
+	}
+	p.videoFrames.Add(1)
+	if _, err := p.VideoW.Write(frame); err != nil {
+		p.videoFrames.Add(-1)
+		return err
+	}
+	return nil
+}
+
+func (p *Pipes) padAudio(n int64) error {
+	p.audioMu.Lock()
+	defer p.audioMu.Unlock()
+	p.audioSamples.Add(n)
+	if _, err := p.AudioW.Write(make([]byte, n*audioFrameBytes)); err != nil {
+		p.audioSamples.Add(-n)
+		return err
+	}
+	return nil
+}
+
+func allClosed(chs []<-chan struct{}) bool {
+	for _, c := range chs {
+		select {
+		case <-c:
+		default:
+			return false
 		}
 	}
-	if padSamples > 0 {
-		if _, err = p.AudioW.Write(make([]byte, padSamples*audioFrameBytes)); err != nil {
-			return padFrames, padSamples, err
-		}
-		p.audioSamples += padSamples
-	}
-	return padFrames, padSamples, nil
+	return true
 }
 
 // blackFrame: ein schwarzes yuv420p-Bild (Y=16, U/V=128 - "tv"-Bereich).
@@ -129,8 +195,7 @@ func blackFrame() []byte {
 // newVideoPipe/newAudioPipe: newFramePipe() fuer die jeweilige dauerhafte
 // Pipe, mit Mitzaehlen fuer Align().
 func (p *Pipes) newVideoPipe() (*os.File, <-chan struct{}, error) {
-	return newFramePipe(p.VideoW, &p.videoMu, videoFrameBytes, func(buf []byte) {
-		p.videoFrames++
+	return newFramePipe(p.VideoW, &p.videoMu, videoFrameBytes, &p.videoFrames, 1, func(buf []byte) {
 		if p.lastVideo == nil {
 			p.lastVideo = make([]byte, videoFrameBytes)
 		}
@@ -139,9 +204,7 @@ func (p *Pipes) newVideoPipe() (*os.File, <-chan struct{}, error) {
 }
 
 func (p *Pipes) newAudioPipe() (*os.File, <-chan struct{}, error) {
-	return newFramePipe(p.AudioW, &p.audioMu, audioFrameBytes, func([]byte) {
-		p.audioSamples++
-	})
+	return newFramePipe(p.AudioW, &p.audioMu, audioFrameBytes, &p.audioSamples, 1, nil)
 }
 
 // newFramePipe legt fuer genau einen Quellprozess ein eigenes, privates Pipe-
@@ -165,11 +228,11 @@ func (p *Pipes) newAudioPipe() (*os.File, <-chan struct{}, error) {
 // verlorenes Teilbild beim Wechsel als eine dauerhaft verschobene
 // Bildgrenze.
 //
-// onFrame laeuft nach jedem erfolgreich weitergereichten Haeppchen, noch
-// unter mu (Mitzaehlen fuer Pipes.Align()). Der zurueckgegebene Kanal wird
-// geschlossen, sobald die Weiterleitung fertig ist - SourcePair.Stop()
-// wartet darauf, damit Align() erst danach zaehlt.
-func newFramePipe(dst *os.File, mu *sync.Mutex, frameSize int, onFrame func([]byte)) (*os.File, <-chan struct{}, error) {
+// count wird vor jedem write() um step erhoeht (bei Fehler zurueckgenommen),
+// onFrame (optional) laeuft davor, noch unter mu - beides fuer
+// Pipes.Align(). Der zurueckgegebene Kanal wird geschlossen, sobald die
+// Weiterleitung fertig ist - Align() wartet darauf.
+func newFramePipe(dst *os.File, mu *sync.Mutex, frameSize int, count *atomic.Int64, step int64, onFrame func([]byte)) (*os.File, <-chan struct{}, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
 		return nil, nil, err
@@ -184,9 +247,13 @@ func newFramePipe(dst *os.File, mu *sync.Mutex, frameSize int, onFrame func([]by
 				return
 			}
 			mu.Lock()
-			_, werr := dst.Write(buf)
-			if werr == nil {
+			if onFrame != nil {
 				onFrame(buf)
+			}
+			count.Add(step)
+			_, werr := dst.Write(buf)
+			if werr != nil {
+				count.Add(-step)
 			}
 			mu.Unlock()
 			if werr != nil {
@@ -205,15 +272,9 @@ type SourcePair struct {
 	forwarders []<-chan struct{}
 }
 
-// forwarderDrainTimeout: Sicherheitsnetz fuer Stop() - normalerweise sind die
-// Weiterleitungen Millisekunden nach dem Kill leer. Haengen sie laenger (etwa
-// weil der Encoder gerade neu startet und nicht liest), geht der Wechsel
-// trotzdem weiter, der Abgleich ist dann eben nur ungefaehr.
-const forwarderDrainTimeout = 2 * time.Second
-
-// Stop beendet beide Prozesse und wartet, bis ihre Weiterleitungen alles
-// schon Gelesene an die dauerhaften Pipes abgegeben haben - erst dann stimmen
-// die Zaehler fuer Pipes.Align().
+// Stop beendet beide Prozesse sofort. Auf ihre Weiterleitungen wartet es
+// bewusst nicht - die koennen haengen, bis die andere Spur nachgeliefert
+// wird, siehe Pipes.Align(), das genau das erledigt.
 func (sp *SourcePair) Stop() {
 	if sp == nil {
 		return
@@ -224,14 +285,14 @@ func (sp *SourcePair) Stop() {
 	if sp.Audio != nil {
 		sp.Audio.Stop()
 	}
-	deadline := time.After(forwarderDrainTimeout)
-	for _, d := range sp.forwarders {
-		select {
-		case <-d:
-		case <-deadline:
-			return
-		}
+}
+
+// Forwarders: die Weiterleitungen dieser Quelle, fuer Pipes.Align().
+func (sp *SourcePair) Forwarders() []<-chan struct{} {
+	if sp == nil {
+		return nil
 	}
+	return sp.forwarders
 }
 
 func startPair(video, audio *Proc, videoErr, audioErr error, forwarders ...<-chan struct{}) (*SourcePair, error) {

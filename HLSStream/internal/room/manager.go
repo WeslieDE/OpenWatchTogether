@@ -87,12 +87,24 @@ func (m *Manager) reap() {
 	}
 	m.mu.Unlock()
 
+	// Je Raum eine eigene Goroutine: haengt ein einzelner Raum beim
+	// Schliessen, darf das nicht das Aufraeumen aller anderen blockieren.
 	for _, r := range stale {
-		r.Close()
+		go m.closeRoom(r)
+	}
+}
+
+func (m *Manager) closeRoom(r *Room) {
+	r.Close()
+	// Unter m.mu: ist der Raum inzwischen neu betreten worden, schreibt
+	// dessen Encoder schon in denselben Ordner - dann bleibt er stehen.
+	m.mu.Lock()
+	if _, reopened := m.rooms[r.Slug()]; !reopened {
 		dir := filepath.Join(m.cfg.HLSDataDir, r.Slug())
 		if err := os.RemoveAll(dir); err != nil {
 			log.Printf("[hls %s] Segmentordner konnte nicht geraeumt werden: %v", r.Slug(), err)
 		}
-		log.Printf("[hls] Raum %q verlassen (Leerlauf)", r.Slug())
 	}
+	m.mu.Unlock()
+	log.Printf("[hls] Raum %q verlassen (Leerlauf)", r.Slug())
 }
