@@ -61,6 +61,7 @@ type Room struct {
 	denied   atomic.Bool
 
 	liveReady    chan liveResult
+	liveRetry    chan int
 	sourceExitCh chan sourceExit
 
 	// Alles ab hier wird ausschliesslich von loop() angefasst.
@@ -108,6 +109,7 @@ func New(cfg config.Config, slug string) (*Room, error) {
 		quit:         make(chan struct{}),
 		done:         make(chan struct{}),
 		liveReady:    make(chan liveResult, 4),
+		liveRetry:    make(chan int, 4),
 		sourceExitCh: make(chan sourceExit, 4),
 		queue:        map[string]hub.QueueItem{},
 	}
@@ -157,6 +159,9 @@ func (r *Room) loop() {
 
 		case res := <-r.liveReady:
 			r.handleLiveReady(res)
+
+		case epoch := <-r.liveRetry:
+			r.handleLiveRetry(epoch)
 
 		case exit := <-r.sourceExitCh:
 			r.handleSourceExit(exit)
@@ -564,7 +569,8 @@ func (r *Room) handleLiveReady(res liveResult) {
 		return
 	}
 	if res.err != nil {
-		log.Printf("[hls %s] Live-Aufbau fehlgeschlagen: %v", r.slug, res.err)
+		log.Printf("[hls %s] Live-Aufbau fehlgeschlagen: %v - neuer Versuch in %v", r.slug, res.err, liveRetryDelay)
+		go r.scheduleLiveRetry(res.epoch, liveRetryDelay)
 		return
 	}
 
@@ -577,6 +583,7 @@ func (r *Room) handleLiveReady(res liveResult) {
 	}
 
 	r.liveSession = res.session
+	go r.watchLiveSession(res.session, res.epoch)
 	r.liveSDP = sdp
 	r.liveHasAudio = res.audioTrack != nil
 	r.liveVideo = res.videoTrack
@@ -604,6 +611,69 @@ func requestKeyFrames(session *sfuclient.Session, video sfuclient.Track) {
 			return
 		}
 	}
+}
+
+// liveRetryDelay: Pause vor einem neuen Live-Aufbau. Der Hub meldet "live"
+// schon, bevor der Sender beim SFU produziert. Meist dauert das nur einen
+// Moment, nach einem Neuaufbau der SFU-Verbindung des Senders aber auch
+// laenger als die 5s in startLive(). Frueher gab HLSStream dann fuer den Rest
+// der Uebertragung auf und zeigte nur das Standbild (Raum "lilhannah",
+// 2026-09-28). Jetzt wird wiederholt, solange die Uebertragung laeuft.
+const liveRetryDelay = 2 * time.Second
+
+func (r *Room) scheduleLiveRetry(epoch int, delay time.Duration) {
+	select {
+	case <-time.After(delay):
+	case <-r.quit:
+		return
+	}
+	select {
+	case r.liveRetry <- epoch:
+	case <-r.quit:
+	}
+}
+
+// watchLiveSession meldet, sobald sich beim SFU an den Producern etwas
+// aendert, die HLSStream gerade konsumiert: der Sender hat aufgehoert
+// (producer-closed), sich neu verbunden (producer-gone + new-producer), die
+// Verbindung zum SFU ist weg, oder ein weiterer Producer ist dazugekommen
+// (etwa der Ton, der erst nach dem Bild kam). In jedem Fall liefert die
+// laufende Live-Quelle nichts Richtiges mehr - ohne neuen Aufbau bliebe das
+// HLS auf einem alten Bild stehen.
+func (r *Room) watchLiveSession(session *sfuclient.Session, epoch int) {
+	// Meldungen aus der Zeit vor dem Consume betreffen alte Producer.
+	for drained := false; !drained; {
+		select {
+		case <-session.Closed:
+		default:
+			drained = true
+		}
+	}
+	select {
+	case <-session.Closed:
+	case <-session.Events:
+	case <-r.quit:
+		return
+	}
+	select {
+	case r.liveRetry <- epoch:
+	case <-r.quit:
+	}
+}
+
+// handleLiveRetry baut die Live-Verbindung neu auf - nur, wenn die Meldung
+// noch zur aktuellen Uebertragung gehoert und diese noch laeuft.
+func (r *Room) handleLiveRetry(epoch int) {
+	if epoch != r.liveEpoch || !r.liveOn {
+		return
+	}
+	log.Printf("[hls %s] Live-Aufbau wird neu gestartet", r.slug)
+	if r.liveSession != nil {
+		r.liveSession.Close()
+		r.liveSession = nil
+	}
+	r.startLiveHandshake()
+	r.applySource()
 }
 
 var errNoVideoProducer = &roomError{"kein Video-Producer innerhalb der Frist"}

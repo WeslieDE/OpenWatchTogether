@@ -139,7 +139,10 @@ func (s *Session) readLoop() {
 				default:
 				}
 			}
-		case "producer-closed":
+		case "producer-closed", "producer-gone":
+			// producer-gone: der Sender hat sich neu verbunden, seine alten
+			// Producer sind weg (neue kommen als new-producer) - fuer
+			// HLSStream dasselbe wie ein Ende, der Aufbau beginnt neu.
 			select {
 			case s.Closed <- Producer{}:
 			default:
