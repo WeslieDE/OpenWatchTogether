@@ -19,30 +19,30 @@ func HoldEntry() string {
 // Playlist, die Player zu sehen bekommen. Ziel: wer in den ersten Sekunden
 // nach dem Raumbeitritt nur das Standbild-Segment bekommen hat (Ersatz-
 // Playlist, Segment 0 = _hold.ts), sieht danach eine Fortsetzung genau
-// dieser Playlist, ohne Widerspruch und ohne Bruch.
+// dieser Playlist - ohne Widerspruch, ohne Bruch, ohne Zeitsprung.
 //
-//   - Das Standbild bleibt als Segment 0 vorn stehen, solange ffmpegs Fenster
-//     noch bei dessen erstem Segment beginnt, und faellt danach regulaer
-//     heraus. ffmpegs Segment n wird zu Sequenznummer n+1. Frueher meldete
-//     ffmpeg Segment 0 selbst als "seg-00000.ts" - dieselbe Nummer fuer zwei
-//     verschiedene Segmente, gemessen gegen vrtogether.de am 2026-10-02.
-//     Ein erster Versuch (2c2e0a9) verschob die Nummern, liess das Standbild
-//     aber sofort fallen: VLC wartet beim Live-Start, bis genug Puffer da
-//     ist, und blieb fuer immer haengen, wenn das Segment, auf dem es stand,
-//     verschwand.
-//   - Die Zeitstempel des Encoders beginnen per -output_ts_offset genau
-//     hinter dem Standbild (siehe encoder.args()), der Uebergang braucht
-//     also kein EXT-X-DISCONTINUITY. Genau so ein Bruch liess Wines
-//     MediaFoundation-Nachbau (AVPro in VRChat unter Proton) mit einer
+//   - Segment 0 bleibt fuer immer _hold.ts: ffmpegs eigenes erstes Segment
+//     wird durch das Standbild ersetzt. Beide haben exakt dasselbe Timing
+//     (gleiche Codec-Parameter, gleiche 2s, gleiche Startverschiebung des
+//     MPEG-TS-Muxers, siehe RenderHold()), seg-00001 schliesst also
+//     lueckenlos an beide an. Frueher nannte ffmpegs Playlist Segment 0
+//     "seg-00000.ts" mit vorangestelltem EXT-X-DISCONTINUITY - dieselbe
+//     Nummer fuer zwei verschiedene Segmente, gemessen gegen vrtogether.de
+//     am 2026-10-02.
+//   - Zwei Zwischenversuche sind daran gescheitert (2c2e0a9, d35cf2d): Das
+//     Standbild sofort fallen zu lassen haengte VLC auf (es wartet beim
+//     Live-Start auf genug Puffer und bleibt fuer immer stehen, wenn das
+//     Segment verschwindet, auf dem es steht). Ein DISCONTINUITY oder auch
+//     nur 20-50ms rueckwaerts laufende Zeitstempel beim Uebergang liessen
+//     Wines MediaFoundation-Nachbau (AVPro in VRChat unter Proton) mit einer
 //     Assertion in mf/session.c abstuerzen.
 //   - ffmpegs eigene DISCONTINUITY-Tags (append_list setzt eines an jeden
 //     Laufbeginn, auch den ersten) werden verworfen. Ein echter Bruch steht
 //     nur vor Segmenten, mit denen ein Encoder-Neustart begonnen hat
-//     (runStarts, siehe Encoder.supervise()) - ausser Segment 0, das ja
-//     nahtlos an das Standbild anschliesst. Fuer Brueche, die schon aus dem
-//     Fenster gefallen sind, zaehlt EXT-X-DISCONTINUITY-SEQUENCE weiter;
-//     ffmpeg selbst schreibt das nie, die Discontinuity-Sequenz liefe sonst
-//     zurueck.
+//     (runStarts, siehe Encoder.supervise()) - ausser Segment 0. Fuer
+//     Brueche, die schon aus dem Fenster gefallen sind, zaehlt
+//     EXT-X-DISCONTINUITY-SEQUENCE weiter; ffmpeg selbst schreibt das nie,
+//     die Discontinuity-Sequenz liefe sonst zurueck.
 func RewritePlaylist(src []byte, runStarts []int) []byte {
 	isBreak := make(map[int]bool, len(runStarts))
 	for _, n := range runStarts {
@@ -59,7 +59,6 @@ func RewritePlaylist(src []byte, runStarts []int) []byte {
 			break
 		}
 	}
-	withHold := mediaSeq == 0
 
 	discSeq := 0
 	for n := range isBreak {
@@ -70,7 +69,7 @@ func RewritePlaylist(src []byte, runStarts []int) []byte {
 
 	var out bytes.Buffer
 	next := mediaSeq // ffmpeg-Nummer des naechsten Segments in der Liste
-	headerDone := false
+	skipURI := false
 	sc = bufio.NewScanner(bytes.NewReader(src))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
@@ -82,27 +81,26 @@ func RewritePlaylist(src []byte, runStarts []int) []byte {
 		case strings.HasPrefix(line, "#EXT-X-DISCONTINUITY-SEQUENCE:"):
 			continue
 		case strings.HasPrefix(line, "#EXT-X-MEDIA-SEQUENCE:"):
-			seq := mediaSeq + 1
-			if withHold {
-				seq = 0
-			}
-			out.WriteString("#EXT-X-MEDIA-SEQUENCE:" + strconv.Itoa(seq) + "\n")
+			out.WriteString(line + "\n")
 			if discSeq > 0 {
 				out.WriteString("#EXT-X-DISCONTINUITY-SEQUENCE:" + strconv.Itoa(discSeq) + "\n")
 			}
 			continue
 		case strings.HasPrefix(line, "#EXTINF:"):
-			if !headerDone {
-				headerDone = true
-				if withHold {
-					out.WriteString(HoldEntry())
-				}
-			}
 			if isBreak[next] {
 				out.WriteString("#EXT-X-DISCONTINUITY\n")
 			}
+			if next == 0 {
+				out.WriteString(HoldEntry())
+				skipURI = true
+				continue
+			}
 		case !strings.HasPrefix(line, "#"):
 			next++
+			if skipURI {
+				skipURI = false
+				continue
+			}
 		}
 		out.WriteString(line + "\n")
 	}
