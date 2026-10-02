@@ -84,6 +84,12 @@ func (e *Encoder) args() []string {
 
 		"-c:a", "aac", "-b:a", "320k", "-ar", strconv.Itoa(SampleRate), "-ac", strconv.Itoa(Channels),
 
+		// Zeitstempel beginnen direkt hinter dem Standbild-Segment aus
+		// RenderHold() (beide mit derselben Startverschiebung des
+		// MPEG-TS-Muxers), damit ein Player, der zuerst das Standbild
+		// bekommen hat, ohne Bruch weiterspielt - siehe RewritePlaylist().
+		"-output_ts_offset", strconv.FormatFloat(HoldDuration, 'f', -1, 64),
+
 		"-f", "hls",
 		"-hls_time", "2",
 		"-hls_list_size", "8",

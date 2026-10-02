@@ -84,19 +84,17 @@ func (s *Server) servePlaylist(w http.ResponseWriter, req *http.Request) {
 // writeHoldPlaylist gibt eine eigenstaendige Ein-Segment-Playlist auf das
 // Standbild zurueck - ohne ENDLIST, weil danach an derselben URL der echte,
 // laufende Stream folgt. Der Player fragt sie beim naechsten Poll ohnehin
-// erneut ab und bekommt dann ganz normal die echte Playlist von ffmpeg - in
-// der das Standbild Sequenznummer pipeline.HoldSequence behaelt und der
-// echte Stream mit einem DISCONTINUITY dahinter anschliesst, siehe
+// erneut ab und bekommt dann die echte Playlist - in der das Standbild als
+// erstes Segment stehen bleibt, bis es regulaer aus dem Fenster faellt, siehe
 // pipeline.RewritePlaylist().
 func (s *Server) writeHoldPlaylist(w http.ResponseWriter) {
 	target := strconv.Itoa(int(math.Ceil(pipeline.HoldDuration)))
 	playlist := "#EXTM3U\n" +
-		"#EXT-X-VERSION:6\n" +
+		"#EXT-X-VERSION:3\n" +
 		"#EXT-X-TARGETDURATION:" + target + "\n" +
-		"#EXT-X-MEDIA-SEQUENCE:" + strconv.Itoa(pipeline.HoldSequence) + "\n" +
+		"#EXT-X-MEDIA-SEQUENCE:0\n" +
 		"#EXT-X-INDEPENDENT-SEGMENTS\n" +
-		"#EXTINF:" + strconv.FormatFloat(pipeline.HoldDuration, 'f', 3, 64) + ",\n" +
-		"_hold.ts\n"
+		pipeline.HoldEntry()
 
 	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
 	w.Header().Set("Cache-Control", "no-cache")

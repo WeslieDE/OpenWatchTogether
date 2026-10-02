@@ -7,47 +7,48 @@ import (
 	"strings"
 )
 
-// HoldSequence ist die Medien-Sequenznummer, die das Standbild-Segment aus
-// RenderHold() in der Ersatz-Playlist (httpapi.writeHoldPlaylist) belegt.
-// Die echten Segmente von ffmpeg werden in RewritePlaylist() um
-// sequenceOffset dahinter verschoben, damit eine Nummer nie fuer zwei
-// verschiedene Segmente steht.
-const HoldSequence = 0
+// HoldEntry: der Playlist-Eintrag fuer das Standbild-Segment aus
+// RenderHold() - in der Ersatz-Playlist (httpapi.writeHoldPlaylist) wie in
+// der echten (RewritePlaylist()) immer derselbe, unter Sequenznummer 0. Die
+// URL ist relativ zur Playlist-Route /stream/<raum>.m3u8.
+func HoldEntry() string {
+	return "#EXTINF:" + strconv.FormatFloat(HoldDuration, 'f', 3, 64) + ",\n_hold.ts\n"
+}
 
-const sequenceOffset = HoldSequence + 1
-
-// RewritePlaylist macht aus der von ffmpeg geschriebenen index.m3u8 eine
-// Playlist, die ueber den Wechsel vom Standbild-Segment auf den echten Stream
-// und ueber das gesamte Gleitfenster hinweg in sich stimmig bleibt.
+// RewritePlaylist macht aus der von ffmpeg geschriebenen index.m3u8 die
+// Playlist, die Player zu sehen bekommen. Ziel: wer in den ersten Sekunden
+// nach dem Raumbeitritt nur das Standbild-Segment bekommen hat (Ersatz-
+// Playlist, Segment 0 = _hold.ts), sieht danach eine Fortsetzung genau
+// dieser Playlist, ohne Widerspruch und ohne Bruch.
 //
-// Ohne das widersprach sie sich an zwei Stellen, beide gemessen gegen
-// https://vrtogether.de/stream/weslie.m3u8 (2026-10-02):
-//
-//   - Die Ersatz-Playlist nennt Segment 0 "_hold.ts", ffmpegs erste Playlist
-//     danach Segment 0 "seg-00000.ts" mit vorangestelltem
-//     EXT-X-DISCONTINUITY. Dieselbe Nummer steht so fuer zwei verschiedene
-//     Segmente in zwei verschiedenen Discontinuity-Sequenzen.
-//   - ffmpeg schreibt nie EXT-X-DISCONTINUITY-SEQUENCE. Faellt das Segment
-//     mit dem DISCONTINUITY-Tag aus dem Fenster, springt die Discontinuity-
-//     Sequenz aller verbleibenden Segmente von 1 zurueck auf 0.
-//
-// Strenge Player (ExoPlayer, also u.a. AVPro auf Quest/Android in VRChat)
-// werten beides als zurueckgesetzte Playlist und brechen ab - typischerweise
-// genau bei den Zuschauern, die in den ersten Sekunden nach dem Raumbeitritt
-// noch das Standbild-Segment bekommen haben.
-//
-// Daher hier: alle Sequenznummern um sequenceOffset hinter das
-// Standbild-Segment verschieben, ffmpegs eigene DISCONTINUITY-Tags verwerfen
-// und stattdessen vor jedes Segment, mit dem ein Encoder-Lauf begonnen hat
-// (runStarts, siehe Encoder.supervise()), selbst eines setzen - inklusive
-// des Zaehlers EXT-X-DISCONTINUITY-SEQUENCE fuer alle, die schon aus dem
-// Fenster gefallen sind. Der Beginn des allerersten Laufs zaehlt dabei immer
-// als Bruch, weil davor (aus Sicht des Players) das Standbild-Segment mit
-// eigenen Zeitstempeln lag.
+//   - Das Standbild bleibt als Segment 0 vorn stehen, solange ffmpegs Fenster
+//     noch bei dessen erstem Segment beginnt, und faellt danach regulaer
+//     heraus. ffmpegs Segment n wird zu Sequenznummer n+1. Frueher meldete
+//     ffmpeg Segment 0 selbst als "seg-00000.ts" - dieselbe Nummer fuer zwei
+//     verschiedene Segmente, gemessen gegen vrtogether.de am 2026-10-02.
+//     Ein erster Versuch (2c2e0a9) verschob die Nummern, liess das Standbild
+//     aber sofort fallen: VLC wartet beim Live-Start, bis genug Puffer da
+//     ist, und blieb fuer immer haengen, wenn das Segment, auf dem es stand,
+//     verschwand.
+//   - Die Zeitstempel des Encoders beginnen per -output_ts_offset genau
+//     hinter dem Standbild (siehe encoder.args()), der Uebergang braucht
+//     also kein EXT-X-DISCONTINUITY. Genau so ein Bruch liess Wines
+//     MediaFoundation-Nachbau (AVPro in VRChat unter Proton) mit einer
+//     Assertion in mf/session.c abstuerzen.
+//   - ffmpegs eigene DISCONTINUITY-Tags (append_list setzt eines an jeden
+//     Laufbeginn, auch den ersten) werden verworfen. Ein echter Bruch steht
+//     nur vor Segmenten, mit denen ein Encoder-Neustart begonnen hat
+//     (runStarts, siehe Encoder.supervise()) - ausser Segment 0, das ja
+//     nahtlos an das Standbild anschliesst. Fuer Brueche, die schon aus dem
+//     Fenster gefallen sind, zaehlt EXT-X-DISCONTINUITY-SEQUENCE weiter;
+//     ffmpeg selbst schreibt das nie, die Discontinuity-Sequenz liefe sonst
+//     zurueck.
 func RewritePlaylist(src []byte, runStarts []int) []byte {
-	isStart := make(map[int]bool, len(runStarts))
+	isBreak := make(map[int]bool, len(runStarts))
 	for _, n := range runStarts {
-		isStart[n] = true
+		if n != 0 {
+			isBreak[n] = true
+		}
 	}
 
 	mediaSeq := 0
@@ -58,9 +59,10 @@ func RewritePlaylist(src []byte, runStarts []int) []byte {
 			break
 		}
 	}
+	withHold := mediaSeq == 0
 
 	discSeq := 0
-	for n := range isStart {
+	for n := range isBreak {
 		if n < mediaSeq {
 			discSeq++
 		}
@@ -68,6 +70,7 @@ func RewritePlaylist(src []byte, runStarts []int) []byte {
 
 	var out bytes.Buffer
 	next := mediaSeq // ffmpeg-Nummer des naechsten Segments in der Liste
+	headerDone := false
 	sc = bufio.NewScanner(bytes.NewReader(src))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
@@ -79,11 +82,23 @@ func RewritePlaylist(src []byte, runStarts []int) []byte {
 		case strings.HasPrefix(line, "#EXT-X-DISCONTINUITY-SEQUENCE:"):
 			continue
 		case strings.HasPrefix(line, "#EXT-X-MEDIA-SEQUENCE:"):
-			out.WriteString("#EXT-X-MEDIA-SEQUENCE:" + strconv.Itoa(mediaSeq+sequenceOffset) + "\n")
-			out.WriteString("#EXT-X-DISCONTINUITY-SEQUENCE:" + strconv.Itoa(discSeq) + "\n")
+			seq := mediaSeq + 1
+			if withHold {
+				seq = 0
+			}
+			out.WriteString("#EXT-X-MEDIA-SEQUENCE:" + strconv.Itoa(seq) + "\n")
+			if discSeq > 0 {
+				out.WriteString("#EXT-X-DISCONTINUITY-SEQUENCE:" + strconv.Itoa(discSeq) + "\n")
+			}
 			continue
 		case strings.HasPrefix(line, "#EXTINF:"):
-			if isStart[next] {
+			if !headerDone {
+				headerDone = true
+				if withHold {
+					out.WriteString(HoldEntry())
+				}
+			}
+			if isBreak[next] {
 				out.WriteString("#EXT-X-DISCONTINUITY\n")
 			}
 		case !strings.HasPrefix(line, "#"):
