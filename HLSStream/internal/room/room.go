@@ -120,8 +120,12 @@ func New(cfg config.Config, slug string) (*Room, error) {
 }
 
 func (r *Room) Slug() string { return r.slug }
-func (r *Room) Denied() bool { return r.denied.Load() }
-func (r *Room) Touch()       { r.lastSeen.Store(time.Now().Unix()) }
+
+// Playlist: die aktuelle HLS-Playlist des Raums, siehe
+// pipeline.Encoder.Playlist().
+func (r *Room) Playlist() ([]byte, error) { return r.encoder.Playlist() }
+func (r *Room) Denied() bool              { return r.denied.Load() }
+func (r *Room) Touch()                    { r.lastSeen.Store(time.Now().Unix()) }
 func (r *Room) IdleFor() time.Duration {
 	return time.Since(time.Unix(r.lastSeen.Load(), 0))
 }

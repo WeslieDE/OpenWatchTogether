@@ -12,7 +12,6 @@ package httpapi
 import (
 	"math"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
@@ -60,8 +59,7 @@ func (s *Server) servePlaylist(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	path := s.manager.PlaylistPath(slug)
-	data, err := os.ReadFile(path)
+	data, err := r.Playlist()
 	if err != nil {
 		// Der Encoder braucht nach dem Beitritt ein paar Sekunden bis zum
 		// ersten echten Segment (Hub-Handshake, Start des Quell-Prozesses,
@@ -86,13 +84,16 @@ func (s *Server) servePlaylist(w http.ResponseWriter, req *http.Request) {
 // writeHoldPlaylist gibt eine eigenstaendige Ein-Segment-Playlist auf das
 // Standbild zurueck - ohne ENDLIST, weil danach an derselben URL der echte,
 // laufende Stream folgt. Der Player fragt sie beim naechsten Poll ohnehin
-// erneut ab und bekommt dann ganz normal die echte Playlist von ffmpeg.
+// erneut ab und bekommt dann ganz normal die echte Playlist von ffmpeg - in
+// der das Standbild Sequenznummer pipeline.HoldSequence behaelt und der
+// echte Stream mit einem DISCONTINUITY dahinter anschliesst, siehe
+// pipeline.RewritePlaylist().
 func (s *Server) writeHoldPlaylist(w http.ResponseWriter) {
 	target := strconv.Itoa(int(math.Ceil(pipeline.HoldDuration)))
 	playlist := "#EXTM3U\n" +
-		"#EXT-X-VERSION:3\n" +
+		"#EXT-X-VERSION:6\n" +
 		"#EXT-X-TARGETDURATION:" + target + "\n" +
-		"#EXT-X-MEDIA-SEQUENCE:0\n" +
+		"#EXT-X-MEDIA-SEQUENCE:" + strconv.Itoa(pipeline.HoldSequence) + "\n" +
 		"#EXT-X-INDEPENDENT-SEGMENTS\n" +
 		"#EXTINF:" + strconv.FormatFloat(pipeline.HoldDuration, 'f', 3, 64) + ",\n" +
 		"_hold.ts\n"

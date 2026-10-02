@@ -24,6 +24,10 @@ type Encoder struct {
 	mu      sync.Mutex
 	current *Proc
 	closed  bool
+
+	// runStarts: die ffmpeg-Segmentnummer, mit der jeder bisherige
+	// Encoder-Lauf begonnen hat - siehe RewritePlaylist().
+	runStarts []int
 }
 
 func NewEncoder(ffmpegPath, outDir, room string, videoR, audioR *os.File) (*Encoder, error) {
@@ -42,7 +46,7 @@ func NewEncoder(ffmpegPath, outDir, room string, videoR, audioR *os.File) (*Enco
 }
 
 func (e *Encoder) args() []string {
-	playlist := filepath.Join(e.outDir, "index.m3u8")
+	playlist := e.playlistPath()
 	segPattern := filepath.Join(e.outDir, "seg-%05d.ts")
 
 	// Bewusst ohne -use_wallclock_as_timestamps: die rohen Formate zaehlen
@@ -109,6 +113,7 @@ func (e *Encoder) supervise() {
 		}
 		e.mu.Unlock()
 
+		e.markRunStart()
 		proc, err := start("encoder", e.ffmpegPath, e.args(), []*os.File{e.videoR, e.audioR}, "[hls "+e.room+"]")
 		if err != nil {
 			log.Printf("[hls %s] encoder-start fehlgeschlagen: %v", e.room, err)
@@ -131,6 +136,36 @@ func (e *Encoder) supervise() {
 		log.Printf("[hls %s] encoder beendet (%v), neuer Versuch", e.room, err)
 		time.Sleep(backoff)
 	}
+}
+
+func (e *Encoder) playlistPath() string {
+	return filepath.Join(e.outDir, "index.m3u8")
+}
+
+// markRunStart merkt sich vor jedem (Neu-)Start, bei welcher Segmentnummer
+// ffmpeg weiterzaehlen wird. Ein Lauf, der vor seinem ersten Segment wieder
+// abstuerzt, hinterlaesst dieselbe Nummer erneut - doppelt eingetragen
+// schadet nicht.
+func (e *Encoder) markRunStart() {
+	data, _ := os.ReadFile(e.playlistPath())
+	n := nextSegmentNumber(data)
+	e.mu.Lock()
+	e.runStarts = append(e.runStarts, n)
+	e.mu.Unlock()
+}
+
+// Playlist liefert die aktuelle Playlist in der fuer Player aufbereiteten
+// Form (siehe RewritePlaylist()) - oder einen Fehler, solange ffmpeg noch
+// keine geschrieben hat.
+func (e *Encoder) Playlist() ([]byte, error) {
+	data, err := os.ReadFile(e.playlistPath())
+	if err != nil {
+		return nil, err
+	}
+	e.mu.Lock()
+	starts := append([]int(nil), e.runStarts...)
+	e.mu.Unlock()
+	return RewritePlaylist(data, starts), nil
 }
 
 func (e *Encoder) Close() {

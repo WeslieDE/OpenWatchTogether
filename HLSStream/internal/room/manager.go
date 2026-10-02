@@ -57,11 +57,6 @@ func (m *Manager) Ensure(rawSlug string) *Room {
 	return r
 }
 
-// PlaylistPath, wo ffmpeg fuer diesen Raum gerade die Playlist schreibt.
-func (m *Manager) PlaylistPath(slug string) string {
-	return filepath.Join(m.cfg.HLSDataDir, Slugify(slug), "index.m3u8")
-}
-
 // Run raeumt in Abstaenden Raeume ab, die niemand mehr abruft.
 func (m *Manager) Run(ctx context.Context) {
 	t := time.NewTicker(5 * time.Second)
