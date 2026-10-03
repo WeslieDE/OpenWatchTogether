@@ -84,6 +84,12 @@ type Proc struct {
 }
 
 func start(name, ffmpegPath string, args []string, extra []*os.File, logPrefix string) (*Proc, error) {
+	return startWatched(name, ffmpegPath, args, extra, logPrefix, nil)
+}
+
+// startWatched: wie start(), nur bekommt onLine (falls gesetzt) zusaetzlich
+// jede Logzeile des Prozesses zu sehen - siehe StartLiveSource().
+func startWatched(name, ffmpegPath string, args []string, extra []*os.File, logPrefix string, onLine func(string)) (*Proc, error) {
 	cmd := exec.Command(ffmpegPath, args...)
 	cmd.ExtraFiles = extra
 	cmd.Stdin = nil
@@ -95,20 +101,23 @@ func start(name, ffmpegPath string, args []string, extra []*os.File, logPrefix s
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%s: start: %w", name, err)
 	}
-	go logLines(logPrefix, stderr)
+	go logLines(logPrefix, stderr, onLine)
 
 	p := &Proc{cmd: cmd, name: name, done: make(chan error, 1)}
 	go func() { p.done <- cmd.Wait() }()
 	return p, nil
 }
 
-func logLines(prefix string, r io.Reader) {
+func logLines(prefix string, r io.Reader, onLine func(string)) {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 4096), 1<<20)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" {
 			continue
+		}
+		if onLine != nil {
+			onLine(line)
 		}
 		log.Printf("%s %s", prefix, line)
 	}

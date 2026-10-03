@@ -365,6 +365,7 @@ async function onMessage(room, conn, raw) {
         });
         conn.transports.set(transport.id, transport);
         conn.recvTransport = transport;
+        conn.plain = true;
 
         send(conn.ws, 'plain-transport-created', { id: transport.id });
         break;
@@ -454,6 +455,14 @@ async function onMessage(room, conn, raw) {
         /* Das eigentliche "der Sender ist weg" kommt gesammelt aus
            stopProducing() - hier wird nur der eigene Verweis aufgeraeumt. */
         consumer.on('producerclose', () => conn.consumers.delete(consumer.id));
+        /* Welche Simulcast-Stufe ein Plain-RTP-Empfaenger (HLSStream)
+           bekommt, ist von aussen sonst nicht zu sehen - und genau daran
+           hing schon einmal ein unscharfes, ruckeliges HLS-Bild. */
+        if (conn.plain && consumer.type === 'simulcast') {
+          consumer.on('layerschange', (layers) => {
+            console.log(`[sfu] ${conn.peer}: Stufe ${layers ? layers.spatialLayer + '/' + layers.temporalLayer : 'keine'}`);
+          });
+        }
 
         send(conn.ws, 'consumer-created', {
           id: consumer.id,

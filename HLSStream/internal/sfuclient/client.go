@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -111,8 +112,68 @@ func Open(host string, port int, room string) (*Session, error) {
 		_ = conn.Close()
 		return nil, err
 	}
-	s.rtpCaps = d.RTPCapabilities
+	caps, err := withoutBandwidthEstimation(d.RTPCapabilities)
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	s.rtpCaps = caps
 	return s, nil
+}
+
+// withoutBandwidthEstimation nimmt aus den RTP-Faehigkeiten des Routers alles
+// heraus, was mediasoup zur Bandbreitenschaetzung zum Empfaenger braucht:
+// "transport-cc"/"goog-remb" als RTCP-Feedback und die zugehoerigen Header-
+// Erweiterungen (transport-wide-cc, abs-send-time).
+//
+// Grund: wer diese Faehigkeiten meldet, bekommt beim SFU eine
+// Bandbreitenschaetzung, die von Rueckmeldungen des Empfaengers lebt - ffmpeg
+// schickt aber keine. Die Schaetzung blieb deshalb bei mediasoups Startwert
+// von 600 kbit/s haengen, und der Simulcast-Consumer waehlte dafuer die
+// kleinste Stufe der Uebertragung (1/3 Aufloesung, 15fps, siehe
+// VIDEO_ENCODINGS in assets/js/webrtc.js) - unscharf und ruckelig im HLS-
+// Stream, waehrend Browser-Zuschauer mit echter Rueckmeldung die volle Stufe
+// sahen. Ohne Schaetzung nimmt der Consumer einfach die hoechste Stufe; auf
+// localhost gibt es ohnehin keine Leitung, die knapp werden koennte.
+func withoutBandwidthEstimation(raw json.RawMessage) (json.RawMessage, error) {
+	var caps map[string]any
+	if err := json.Unmarshal(raw, &caps); err != nil {
+		return nil, fmt.Errorf("sfu: rtp-capabilities: %w", err)
+	}
+	if codecs, ok := caps["codecs"].([]any); ok {
+		for _, c := range codecs {
+			codec, ok := c.(map[string]any)
+			if !ok {
+				continue
+			}
+			fbs, ok := codec["rtcpFeedback"].([]any)
+			if !ok {
+				continue
+			}
+			kept := []any{}
+			for _, f := range fbs {
+				if fb, ok := f.(map[string]any); ok && (fb["type"] == "transport-cc" || fb["type"] == "goog-remb") {
+					continue
+				}
+				kept = append(kept, f)
+			}
+			codec["rtcpFeedback"] = kept
+		}
+	}
+	if exts, ok := caps["headerExtensions"].([]any); ok {
+		kept := []any{}
+		for _, e := range exts {
+			if ext, ok := e.(map[string]any); ok {
+				uri, _ := ext["uri"].(string)
+				if strings.Contains(uri, "transport-wide-cc") || strings.Contains(uri, "abs-send-time") {
+					continue
+				}
+			}
+			kept = append(kept, e)
+		}
+		caps["headerExtensions"] = kept
+	}
+	return json.Marshal(caps)
 }
 
 func (s *Session) readLoop() {

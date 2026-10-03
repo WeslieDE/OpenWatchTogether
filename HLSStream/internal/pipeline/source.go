@@ -57,6 +57,10 @@ func NewPipes() (*Pipes, error) {
 	return &Pipes{VideoR: vr, VideoW: vw, AudioR: ar, AudioW: aw}, nil
 }
 
+// VideoFrames: wie viele Bilder bisher insgesamt an den Encoder gingen -
+// room.watchLiveStall() erkennt daran ein stehendes Live-Bild.
+func (p *Pipes) VideoFrames() int64 { return p.videoFrames.Load() }
+
 func (p *Pipes) Close() {
 	p.VideoR.Close()
 	p.VideoW.Close()
@@ -383,18 +387,18 @@ const readySignalTimeout = 2 * time.Second
 // blockierte Aufrufer (loop() in room.go) macht nichts anderes, als was der
 // ohnehin schon kurze Stillstand beim Quellwechsel erlaubt (siehe
 // "Nahtloser Quellwechsel" im Architekturplan).
-func startVideoSynced(name, ffmpegPath string, args []string, videoW *os.File, logPrefix string) (*Proc, error) {
+func startVideoSynced(name, ffmpegPath string, args []string, videoW *os.File, logPrefix string, onLine func(string)) (*Proc, error) {
 	pr, pw, err := os.Pipe()
 	if err != nil {
 		// Kein Sync moeglich, aber kein Grund, den Quellwechsel deswegen
 		// ganz scheitern zu lassen.
-		proc, serr := start(name, ffmpegPath, args, []*os.File{videoW}, logPrefix)
+		proc, serr := startWatched(name, ffmpegPath, args, []*os.File{videoW}, logPrefix, onLine)
 		videoW.Close()
 		return proc, serr
 	}
 
 	full := append(append([]string{}, args...), "-progress", "pipe:4", "-stats_period", "0.05")
-	proc, err := start(name, ffmpegPath, full, []*os.File{videoW, pw}, logPrefix)
+	proc, err := startWatched(name, ffmpegPath, full, []*os.File{videoW, pw}, logPrefix, onLine)
 	videoW.Close()
 	pw.Close()
 	if err != nil {
@@ -443,7 +447,7 @@ func StartIdleSource(ffmpegPath, room, pausedImage string, pipes *Pipes) (*Sourc
 		"-vf", videoFilter,
 	}
 	videoArgs = append(videoArgs, videoOutputArgs()...)
-	video, vErr := startVideoSynced("source-idle-v", ffmpegPath, videoArgs, vw, "[hls "+room+" idle bild]")
+	video, vErr := startVideoSynced("source-idle-v", ffmpegPath, videoArgs, vw, "[hls "+room+" idle bild]", nil)
 
 	aw, aDone, err := pipes.newAudioPipe()
 	if err != nil {
@@ -480,7 +484,7 @@ func StartFileSource(ffmpegPath, room, file string, startSeconds float64, hasAud
 	videoArgs = append(videoArgs, seek...)
 	videoArgs = append(videoArgs, "-i", file, "-map", "0:v:0", "-vf", videoFilter)
 	videoArgs = append(videoArgs, videoOutputArgs()...)
-	video, vErr := startVideoSynced("source-file-v", ffmpegPath, videoArgs, vw, "[hls "+room+" datei bild]")
+	video, vErr := startVideoSynced("source-file-v", ffmpegPath, videoArgs, vw, "[hls "+room+" datei bild]", nil)
 
 	aw, aDone, err := pipes.newAudioPipe()
 	if err != nil {
@@ -509,6 +513,30 @@ func StartFileSource(ffmpegPath, room, file string, startSeconds float64, hasAud
 // StartLiveSource().
 const liveVideoFilter = videoFilter + ":start_time=0"
 
+// liveSocketBuffer: Empfangspuffer der RTP-Sockets des Live-Prozesses. Ein
+// Keyframe einer 1080p-Bildschirmuebertragung kommt als Schwall von einigen
+// hundert KB auf einmal; laeuft der Socket-Puffer dabei ueber, fehlen dem
+// Bild Pakete, und ohne NACK (ffmpeg schickt keins) bleibt es bis zum
+// naechsten Keyframe kaputt. Der Kernel deckelt den Wert auf
+// net.core.rmem_max - auf dem Host lohnt es sich also, das anzuheben.
+const liveSocketBuffer = 8 << 20
+
+// liveReorderDelay: wie lange ffmpeg auf ein fehlendes RTP-Paket wartet,
+// bevor es die Luecke ueberspringt (Vorgabe 100ms).
+//
+// Geht auf dem Weg vom Sender zum SFU ein Paket verloren, fordert mediasoup
+// es per NACK beim Sender neu an und reicht es nach - um mindestens eine
+// Umlaufzeit verspaetet, bei einem zweiten Versuch entsprechend mehr. Ein
+// Browser-Zuschauer wartet darauf, ffmpeg gab nach 100ms auf ("max delay
+// reached" / "RTP: missed 1 packets", das nachgereichte Paket dann "received
+// too late"). Das angebrochene VP8-Bild liess den Decoder bis zum naechsten
+// Keyframe Bilder verwerfen - im HLS-Stream ein Ruckeln, das auf der Website
+// niemand sah (Raum "lilhannah": ueber 1800 solcher Luecken in drei Tagen).
+// Gewartet wird nur, wenn tatsaechlich eine Luecke da ist; danach holt der
+// Prozess den Rueckstand sofort auf, der Stream wird dadurch also nicht
+// dauerhaft spaeter.
+const liveReorderDelay = 500 * time.Millisecond
+
 // StartLiveSource reencoded eine laufende Bildschirmuebertragung (per SDP aus
 // dem Plain-RTP-Consume beim SFU, siehe internal/sfuclient und rtp.go) in
 // dieselben Pipes. Anders als Datei und Standbild laufen Bild und Ton hier in
@@ -535,19 +563,27 @@ const liveVideoFilter = videoFilter + ":start_time=0"
 // Fehlt eine Tonspur (Bildschirmuebertragung ohne mitgeteiltes Audio), gibt
 // es nichts abzugleichen: dann Bild wie gehabt plus Stille aus einem
 // eigenen Prozess.
-func StartLiveSource(ffmpegPath, room, sdp string, hasAudio bool, pipes *Pipes) (*SourcePair, error) {
+//
+// onLog (optional) sieht jede Logzeile des Live-Prozesses - room.go erkennt
+// daran verlorene Pakete und fordert einen frischen Keyframe an, siehe
+// room.watchLiveLoss().
+func StartLiveSource(ffmpegPath, room, sdp string, hasAudio bool, pipes *Pipes, onLog func(string)) (*SourcePair, error) {
 	// analyzeduration 3s: ohne Keyframe kennt ffmpeg die Bildgroesse nicht
 	// und gibt nach Ablauf der Frist die Bildspur auf. Der angeforderte
 	// Keyframe (room.requestKeyFrames()) braucht normalerweise nur ein paar
 	// hundert Millisekunden, die Frist ist nur der Puffer dafuer.
+	//
+	// max_delay: siehe liveReorderDelay.
 	input := []string{
 		"-hide_banner", "-loglevel", "warning",
 		"-protocol_whitelist", "file,udp,rtp",
 		"-analyzeduration", "3000000", "-probesize", "5000000",
+		"-buffer_size", strconv.Itoa(liveSocketBuffer),
+		"-max_delay", strconv.Itoa(int(liveReorderDelay / time.Microsecond)),
 		"-i", sdp,
 	}
 	if !hasAudio {
-		return startLiveVideoOnly(ffmpegPath, room, input, pipes)
+		return startLiveVideoOnly(ffmpegPath, room, input, pipes, onLog)
 	}
 
 	vw, vDone, err := pipes.newVideoPipe()
@@ -566,7 +602,7 @@ func StartLiveSource(ffmpegPath, room, sdp string, hasAudio bool, pipes *Pipes) 
 		"-map", "0:a:0", "-af", "aresample=async=1:first_pts=0",
 		"-f", "s16le", "-ar", strconv.Itoa(SampleRate), "-ac", strconv.Itoa(Channels), "pipe:4",
 	)
-	proc, err := start("source-live", ffmpegPath, args, []*os.File{vw, aw}, "[hls "+room+" live]")
+	proc, err := startWatched("source-live", ffmpegPath, args, []*os.File{vw, aw}, "[hls "+room+" live]", onLog)
 	vw.Close()
 	aw.Close()
 	if err != nil {
@@ -578,14 +614,14 @@ func StartLiveSource(ffmpegPath, room, sdp string, hasAudio bool, pipes *Pipes) 
 	return &SourcePair{Video: proc, Audio: proc, forwarders: []<-chan struct{}{vDone, aDone}}, nil
 }
 
-func startLiveVideoOnly(ffmpegPath, room string, input []string, pipes *Pipes) (*SourcePair, error) {
+func startLiveVideoOnly(ffmpegPath, room string, input []string, pipes *Pipes, onLog func(string)) (*SourcePair, error) {
 	vw, vDone, err := pipes.newVideoPipe()
 	if err != nil {
 		return nil, err
 	}
 	videoArgs := append(append([]string{}, input...), "-map", "0:v:0", "-vf", videoFilter)
 	videoArgs = append(videoArgs, videoOutputArgs()...)
-	video, vErr := startVideoSynced("source-live-v", ffmpegPath, videoArgs, vw, "[hls "+room+" live bild]")
+	video, vErr := startVideoSynced("source-live-v", ffmpegPath, videoArgs, vw, "[hls "+room+" live bild]", onLog)
 
 	aw, aDone, err := pipes.newAudioPipe()
 	if err != nil {

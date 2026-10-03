@@ -68,7 +68,7 @@ func TestLiveSourceAVSync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := StartLiveSource(ffmpeg, "test", sdp, true, pipes)
+	src, err := StartLiveSource(ffmpeg, "test", sdp, true, pipes, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

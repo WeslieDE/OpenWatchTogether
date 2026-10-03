@@ -10,6 +10,7 @@ import (
 	"log"
 	"math"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -414,9 +415,11 @@ func (r *Room) switchTo(kind string, item hub.QueueItem, startAt float64) {
 		}
 
 	case "live":
-		proc, err = pipeline.StartLiveSource(r.cfg.FFmpegPath, r.slug, r.liveSDP, r.liveHasAudio, r.pipes)
+		proc, err = pipeline.StartLiveSource(r.cfg.FFmpegPath, r.slug, r.liveSDP, r.liveHasAudio, r.pipes,
+			watchLiveLoss(r.liveSession, r.liveVideo))
 		if err == nil {
 			go requestKeyFrames(r.liveSession, r.liveVideo)
+			go watchLiveStall(r.liveSession, r.liveVideo, r.pipes, proc.Forwarders()[0])
 		}
 
 	default: // "idle"
@@ -613,6 +616,106 @@ func requestKeyFrames(session *sfuclient.Session, video sfuclient.Track) {
 		waited = d
 		if err := session.RequestKeyFrame(video); err != nil {
 			return
+		}
+	}
+}
+
+// liveStallCheck: wie oft watchLiveStall() nachsieht, ob die Live-Quelle
+// noch Bilder liefert.
+const liveStallCheck = time.Second
+
+// watchLiveStall fordert so lange jede liveStallCheck einen frischen
+// Keyframe an, wie die laufende Live-Quelle kein neues Bild an den Encoder
+// weiterreicht - bis die Bild-Weiterleitung der Quelle leer gelaufen ist
+// (done, siehe pipeline.SourcePair.Forwarders(); nicht Proc.Done(), das nur
+// einmal lesbar ist und watchSourceExit() gehoert).
+//
+// Grund: steht das Bild, weil dem VP8-Decoder ein Keyframe fehlt, laeuft der
+// Ton im selben Prozess weiter. Der Encoder liest die vorauslaufende Spur
+// aber erst weiter, wenn die andere aufgeholt hat - nach rund 10s (siehe
+// audioQueueChunks in internal/pipeline) ist der Tonpuffer voll, der Live-
+// Prozess blockiert beim Schreiben des Tons und liest auch das RTP nicht
+// mehr. Dann kommt der rettende Keyframe nie mehr an, und das Bild im HLS-
+// Stream bleibt bis zum naechsten Quellwechsel stehen (lokal nachgestellt
+// mit 1,5% Paketverlust, 2026-10-03). watchLiveLoss() faengt die haeufige
+// Ursache ab; das hier ist das Sicherheitsnetz, falls ein Stillstand ohne
+// passende Logzeile beginnt.
+func watchLiveStall(session *sfuclient.Session, video sfuclient.Track, pipes *pipeline.Pipes, done <-chan struct{}) {
+	if session == nil {
+		return
+	}
+	tick := time.NewTicker(liveStallCheck)
+	defer tick.Stop()
+	last := pipes.VideoFrames()
+	for {
+		select {
+		case <-done:
+			return
+		case <-tick.C:
+		}
+		now := pipes.VideoFrames()
+		if now == last {
+			if err := session.RequestKeyFrame(video); err != nil {
+				return
+			}
+		}
+		last = now
+	}
+}
+
+// liveLossMarkers: Logzeilen des Live-ffmpeg, die bedeuten, dass dem Bild
+// gerade Pakete fehlen (verloren oder zu spaet) bzw. der Decoder deshalb
+// Bilder verwirft.
+var liveLossMarkers = []string{
+	"RTP: missed",
+	"RTP: dropping old packet",
+	"Keyframe missing",
+	"dropping frame",
+	"Discarding interframe",
+	"corrupt",
+}
+
+// liveLossKeyFrameGap: hoechstens so oft ein neuer Keyframe wegen
+// Paketverlust - ein Verlust kommt meist als Schwall mehrerer Logzeilen.
+const liveLossKeyFrameGap = 500 * time.Millisecond
+
+// watchLiveLoss liefert den Log-Beobachter fuer pipeline.StartLiveSource():
+// sobald ffmpeg verlorene Pakete meldet, wird beim SFU ein frischer Keyframe
+// angefordert.
+//
+// Grund: ein Browser-Zuschauer meldet jeden Verlust per NACK/PLI selbst und
+// hat das Bild nach Sekundenbruchteilen wieder - ffmpeg tut das nicht. Ein
+// einziges verlorenes Paket liess das VP8-Bild im HLS-Stream so bis zum
+// naechsten Keyframe stehen oder zerfallen, und den schickt eine
+// Bildschirmuebertragung von sich aus oft erst nach vielen Sekunden.
+// Schlimmer noch beim Start: kam der erste Keyframe nicht durch, gab der
+// Live-Prozess nie ein Bild aus, der Ton staute sich, bis der Prozess nicht
+// mehr las - und der Raum blieb ohne ein einziges Segment.
+func watchLiveLoss(session *sfuclient.Session, video sfuclient.Track) func(string) {
+	if session == nil {
+		return nil
+	}
+	var mu sync.Mutex
+	var last time.Time
+	return func(line string) {
+		lost := false
+		for _, m := range liveLossMarkers {
+			if strings.Contains(line, m) {
+				lost = true
+				break
+			}
+		}
+		if !lost {
+			return
+		}
+		mu.Lock()
+		due := time.Since(last) >= liveLossKeyFrameGap
+		if due {
+			last = time.Now()
+		}
+		mu.Unlock()
+		if due {
+			_ = session.RequestKeyFrame(video)
 		}
 	}
 }
