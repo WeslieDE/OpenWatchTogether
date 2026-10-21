@@ -17,7 +17,7 @@ RUN go mod download
 COPY HLSStream/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /hlsstream ./cmd/hlsstream
 
-FROM php:8.3-apache
+FROM php:8.5.12-apache
 
 # ffmpeg fuer Laufzeit und Vorschaubild (auch fuer HLSStream), supervisor
 # haelt alle vier Prozesse am Leben. In der Entwicklung unter Windows liegt
